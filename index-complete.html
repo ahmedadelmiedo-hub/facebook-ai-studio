@@ -3,91 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ناشر فيسبوك - النشر الآمن</title>
+    <title>ناشر فيسبوك</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI';
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-    </style>
 </head>
-<body class="text-gray-900 min-h-screen">
-
-    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm px-4 h-14 flex items-center justify-between">
+<body class="text-gray-900">
+    <header class="bg-white/95 px-4 h-14 flex items-center justify-between border-b">
         <div class="flex items-center gap-2">
             <div class="bg-blue-600 text-white font-bold w-10 h-10 rounded-full flex items-center justify-center">f</div>
-            <span class="font-black text-lg text-blue-600 hidden sm:inline">Facebook Publisher</span>
+            <span class="font-black text-lg text-blue-600">Facebook Publisher</span>
         </div>
-        <div id="userStatus" class="flex gap-2">
-            <button id="fbLoginBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg text-sm">تسجيل دخول</button>
-        </div>
+        <button id="fbLoginBtn" class="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg">تسجيل دخول</button>
     </header>
 
     <main class="max-w-2xl mx-auto px-4 py-8">
-        
-        <div id="welcomeSection" class="bg-white p-6 rounded-2xl shadow-xl mb-6">
+        <div id="welcomeSection" class="bg-white p-6 rounded-2xl shadow-xl">
             <h1 class="text-2xl font-black text-gray-800 mb-4">📱 ناشر منشورات فيسبوك</h1>
-            <p class="text-gray-600">سجّل دخولك بحسابك على فيسبوك وانشر المنشورات مباشرة على صفحتك بأمان تام.</p>
+            <p class="text-gray-600">سجّل دخولك وانشر المنشورات على صفحتك مباشرة.</p>
         </div>
 
-        <div id="publisherSection" class="hidden space-y-6">
-            
-            <div id="userCard" class="bg-white p-4 rounded-2xl shadow-md flex items-center gap-3">
+        <div id="publisherSection" class="hidden mt-6 space-y-6">
+            <div class="bg-white p-4 rounded-2xl shadow-md flex items-center gap-3">
                 <img id="userPhoto" src="" alt="User" class="w-12 h-12 rounded-full">
                 <div class="flex-1">
                     <p class="font-black text-gray-800" id="userName">المستخدم</p>
-                    <p class="text-xs text-gray-500" id="userEmail">email@example.com</p>
                 </div>
-                <button id="fbLogoutBtn" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-1 rounded-lg text-xs">خروج</button>
+                <button id="fbLogoutBtn" class="bg-red-50 text-red-600 px-3 py-1 rounded-lg text-xs font-bold">خروج</button>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-xl space-y-4">
-                <h2 class="font-black text-lg text-gray-800">✍️ إنشاء منشور</h2>
+            <div class="bg-white p-6 rounded-2xl shadow-xl">
+                <h2 class="font-black text-lg mb-4">✍️ إنشاء منشور</h2>
                 <form id="postForm" class="space-y-4">
-                    <textarea id="postContent" rows="5" placeholder="اكتب محتوى المنشور..." class="w-full p-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-sm" required></textarea>
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl">🚀 نشر المنشور</button>
+                    <textarea id="postContent" rows="5" placeholder="اكتب المنشور..." class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 text-sm" required></textarea>
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-xl">🚀 نشر</button>
                 </form>
             </div>
 
             <div id="statusMessage" class="hidden p-4 rounded-2xl shadow-md text-sm font-bold"></div>
-
         </div>
-
     </main>
 
-    <!-- Facebook SDK -->
     <script async defer crossorigin="anonymous" src="https://connect.facebook.net/ar_AR/sdk.js#xfbml=1&version=v18.0&appId=1128729679388763"></script>
-
     <script>
-        lucide.createIcons();
-
         const APP_ID = '1128729679388763';
         const PAGE_ID = '61567560452398';
-        
         let userAccessToken = null;
-        let userInfo = null;
 
-        const fbLoginBtn = document.getElementById('fbLoginBtn');
-        const fbLogoutBtn = document.getElementById('fbLogoutBtn');
-        const publisherSection = document.getElementById('publisherSection');
-        const welcomeSection = document.getElementById('welcomeSection');
-        const postForm = document.getElementById('postForm');
-        const postContent = document.getElementById('postContent');
-        const statusMessage = document.getElementById('statusMessage');
-        const userPhoto = document.getElementById('userPhoto');
-        const userName = document.getElementById('userName');
-        const userEmail = document.getElementById('userEmail');
-
-        // تهيئة Facebook SDK
         window.fbAsyncInit = function() {
-            FB.init({
-                appId: APP_ID,
-                xfbml: true,
-                version: 'v18.0'
-            });
-
+            FB.init({ appId: APP_ID, version: 'v18.0' });
             FB.getLoginStatus(function(response) {
                 if (response.status === 'connected') {
                     handleLoginSuccess(response.authResponse);
@@ -95,8 +58,7 @@
             });
         };
 
-        // زر تسجيل الدخول
-        fbLoginBtn.addEventListener('click', function() {
+        document.getElementById('fbLoginBtn').addEventListener('click', function() {
             FB.login(function(response) {
                 if (response.authResponse) {
                     handleLoginSuccess(response.authResponse);
@@ -106,94 +68,63 @@
             }, { scope: 'public_profile,email,pages_manage_posts' });
         });
 
-        // زر تسجيل الخروج
-        fbLogoutBtn.addEventListener('click', function() {
+        document.getElementById('fbLogoutBtn').addEventListener('click', function() {
             FB.logout(function() {
                 userAccessToken = null;
-                fbLoginBtn.style.display = 'block';
-                publisherSection.classList.add('hidden');
-                welcomeSection.classList.remove('hidden');
+                document.getElementById('fbLoginBtn').style.display = 'block';
+                document.getElementById('publisherSection').classList.add('hidden');
+                document.getElementById('welcomeSection').classList.remove('hidden');
                 showStatus('تم تسجيل الخروج', 'success');
             });
         });
 
-        // معالجة تسجيل الدخول الناجح
         function handleLoginSuccess(authResponse) {
             userAccessToken = authResponse.accessToken;
-            
             FB.api('/me', { fields: 'id,name,email,picture' }, function(response) {
-                userInfo = response;
-                
-                fbLoginBtn.style.display = 'none';
-                publisherSection.classList.remove('hidden');
-                welcomeSection.classList.add('hidden');
-                
-                userPhoto.src = response.picture.data.url;
-                userName.textContent = response.name;
-                userEmail.textContent = response.email || 'بدون بريد';
-                
+                document.getElementById('fbLoginBtn').style.display = 'none';
+                document.getElementById('publisherSection').classList.remove('hidden');
+                document.getElementById('welcomeSection').classList.add('hidden');
+                document.getElementById('userPhoto').src = response.picture.data.url;
+                document.getElementById('userName').textContent = response.name;
                 showStatus('✓ مرحباً ' + response.name, 'success');
             });
         }
 
-        // إرسال المنشور
-        postForm.addEventListener('submit', async (e) => {
+        document.getElementById('postForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const message = postContent.value.trim();
+            const message = document.getElementById('postContent').value.trim();
             if (!message) {
-                showStatus('اكتب المنشور أولاً', 'error');
+                showStatus('اكتب المنشور', 'error');
                 return;
             }
-
             showStatus('جاري النشر...', 'loading');
-
             try {
-                // منشورات مباشرة على الصفحة بدون API backend
-                const response = await fetch(
-                    `https://graph.facebook.com/v18.0/${PAGE_ID}/feed`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            message: message,
-                            access_token: userAccessToken
-                        })
-                    }
-                );
-
+                const response = await fetch(`https://graph.facebook.com/v18.0/${PAGE_ID}/feed`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, access_token: userAccessToken })
+                });
                 const data = await response.json();
-
                 if (data.id) {
-                    showStatus('✓ تم النشر بنجاح! معرف المنشور: ' + data.id, 'success');
-                    postContent.value = '';
+                    showStatus('✓ تم النشر بنجاح!', 'success');
+                    document.getElementById('postContent').value = '';
                 } else {
-                    showStatus('✗ خطأ: ' + (data.error?.message || 'فشل النشر'), 'error');
+                    showStatus('✗ خطأ: ' + (data.error?.message || 'فشل'), 'error');
                 }
             } catch (error) {
-                showStatus('✗ خطأ في الاتصال: ' + error.message, 'error');
+                showStatus('✗ خطأ: ' + error.message, 'error');
             }
         });
 
-        // عرض الرسائل
-        function showStatus(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.classList.remove('hidden');
-            
-            if (type === 'success') {
-                statusMessage.className = 'bg-green-50 text-green-700 border border-green-200 p-4 rounded-2xl shadow-md text-sm font-bold';
-            } else if (type === 'error') {
-                statusMessage.className = 'bg-red-50 text-red-700 border border-red-200 p-4 rounded-2xl shadow-md text-sm font-bold';
-            } else {
-                statusMessage.className = 'bg-blue-50 text-blue-700 border border-blue-200 p-4 rounded-2xl shadow-md text-sm font-bold';
-            }
-
-            if (type !== 'loading') {
-                setTimeout(() => statusMessage.classList.add('hidden'), 5000);
-            }
+        function showStatus(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            if (type === 'success') el.className = 'bg-green-50 text-green-700 border border-green-200 p-4 rounded-2xl text-sm font-bold';
+            else if (type === 'error') el.className = 'bg-red-50 text-red-700 border border-red-200 p-4 rounded-2xl text-sm font-bold';
+            else el.className = 'bg-blue-50 text-blue-700 border border-blue-200 p-4 rounded-2xl text-sm font-bold';
+            if (type !== 'loading') setTimeout(() => el.classList.add('hidden'), 5000);
         }
-
     </script>
-
 </body>
 </html>
