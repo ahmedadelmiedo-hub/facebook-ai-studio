@@ -29,6 +29,7 @@ MAX_BLUEPRINT_COMPLETION_TOKENS = 2_000
 MAX_EPISODE_COMPLETION_TOKENS = 6_500
 MAX_CONTINUATION_COMPLETION_TOKENS = 2_200
 MAX_EPISODE_CONTINUATIONS = 3
+MAX_SHORT_COMPLETION_TOKENS = 500
 MAX_PROVIDER_RETRIES = 4
 
 
@@ -295,7 +296,7 @@ def complete_underlength_episode(
 
 def build_short_prompt(*, script: str, episode: EpisodePlan, series_title: str, kind: str, instruction: str) -> list[dict[str, str]]:
     """Build a self-contained teaser prompt without copying the full episode verbatim."""
-    source_limit = 8_000
+    source_limit = 2_400
     source = script[:source_limit]
     if kind != "opening_hook":
         source = script[max(0, len(script) // 3) : max(0, len(script) // 3) + source_limit]
@@ -395,7 +396,7 @@ def build_series(settings: WriterSettings, *, story_id: str, requested_theme: st
                         kind=short.kind,
                         instruction=short.source_instruction,
                     ),
-                    max_tokens=1_200,
+                    max_tokens=MAX_SHORT_COMPLETION_TOKENS,
                 )
             )
             write_text(short_path, short_script)

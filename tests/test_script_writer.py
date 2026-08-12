@@ -8,6 +8,7 @@ from core.story_planner import build_series_plan
 from core.script_writer import (
     WriterSettings,
     build_series,
+    build_short_prompt,
     complete_underlength_episode,
     parse_json_response,
     retry_after_seconds,
@@ -27,6 +28,24 @@ class ScriptWriterTests(unittest.TestCase):
     def test_rate_limit_delay_is_extracted(self):
         self.assertEqual(retry_after_seconds("Please try again in 21.5s."), 23.5)
         self.assertEqual(retry_after_seconds("rate limited"), 25.0)
+
+    def test_short_prompt_limits_source_excerpt(self):
+        plan = build_series_plan(
+            story_id="case-001",
+            series_title="ملف الاختبار",
+            language="الفصحى المعاصرة",
+            estimated_total_words=12_000,
+        )
+        episode = plan.episodes[0]
+        prompt = build_short_prompt(
+            script="س" * 5_000,
+            episode=episode,
+            series_title=plan.series_title,
+            kind="opening_hook",
+            instruction="ابدأ بسؤال مشوق.",
+        )
+        source = prompt[-1]["content"].split("النص المرجعي من الحلقة (استخدم معناه فقط، ولا تنسخ أكثر من جملة قصيرة):\n", 1)[1].rsplit("\n\nاكتب بين", 1)[0]
+        self.assertEqual(len(source), 2_400)
 
     def test_underlength_episode_is_completed_before_rendering(self):
         plan = build_series_plan(
