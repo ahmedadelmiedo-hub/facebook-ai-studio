@@ -127,6 +127,22 @@ def first_pending_long_asset(
     return replace(first, scheduled_at=launch_at)
 
 
+def first_pending_short_asset(
+    assets: list[PublishableAsset],
+    state: dict[str, Any],
+) -> PublishableAsset:
+    """Return the earliest unuploaded promotional Short without touching long episodes."""
+    completed = state.get("assets", {})
+    candidates = [
+        asset for asset in assets
+        if asset.content_format == "short"
+        and completed.get(asset.asset_id, {}).get("status") not in DONE_STATUSES
+    ]
+    if not candidates:
+        raise RuntimeError("no pending promotional Short is available")
+    return min(candidates, key=lambda item: (item.scheduled_at, item.part_number, item.asset_id))
+
+
 def render_asset(asset: PublishableAsset, *, content_root: Path, output_root: Path) -> Path:
     """Render one planned asset through the existing Fish Audio + MoviePy path."""
     args = build_autopilot_parser().parse_args(
@@ -156,17 +172,19 @@ def run_daily(
     target_date: datetime | None = None,
     dry_run: bool = False,
     publish_first_now: bool = False,
+    publish_short_now: bool = False,
 ) -> list[dict[str, Any]]:
     """Produce and publish the assets due on the Cairo calendar date."""
     story_id = find_or_create_story_plan(content_root, dry_run=dry_run)
     assets = load_series_assets(content_root, story_id)
     state = load_state(content_root, story_id)
     initial_launch = publish_first_now and not state.get("assets")
-    due = (
-        [first_pending_long_asset(assets, state, now=target_date)]
-        if initial_launch
-        else due_assets_for_date(assets, state, target_date)
-    )
+    if publish_short_now:
+        due = [first_pending_short_asset(assets, state)]
+    elif initial_launch:
+        due = [first_pending_long_asset(assets, state, now=target_date)]
+    else:
+        due = due_assets_for_date(assets, state, target_date)
     if not due:
         return []
     if dry_run:
@@ -209,6 +227,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Publish the first long episode immediately on the initial manual launch.",
     )
+    parser.add_argument(
+        "--publish-short-now",
+        action="store_true",
+        help="Publish the earliest pending promotional Short without re-uploading long episodes.",
+    )
     return parser
 
 
@@ -222,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             target_date=target,
             dry_run=args.dry_run,
             publish_first_now=args.publish_first_now,
+            publish_short_now=args.publish_short_now,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}")
