@@ -2,10 +2,13 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
+from core.story_planner import build_series_plan
 from core.script_writer import (
     WriterSettings,
     build_series,
+    complete_underlength_episode,
     parse_json_response,
     retry_after_seconds,
     sanitize_story_id,
@@ -24,6 +27,31 @@ class ScriptWriterTests(unittest.TestCase):
     def test_rate_limit_delay_is_extracted(self):
         self.assertEqual(retry_after_seconds("Please try again in 21.5s."), 23.5)
         self.assertEqual(retry_after_seconds("rate limited"), 25.0)
+
+    def test_underlength_episode_is_completed_before_rendering(self):
+        plan = build_series_plan(
+            story_id="case-001",
+            series_title="ملف الاختبار",
+            language="الفصحى المعاصرة",
+            estimated_total_words=12_000,
+        )
+        episode = plan.episodes[0]
+        settings = WriterSettings(
+            api_key="test-key",
+            base_url="https://example.invalid/v1",
+            model="test-model",
+            output_root=Path("content"),
+            dry_run=False,
+        )
+        with patch("core.script_writer.request_chat", return_value=" ".join(["تكملة"] * 2_500)) as request:
+            completed = complete_underlength_episode(
+                settings,
+                plan=plan,
+                episode=episode,
+                script="افتتاح قصير",
+            )
+        self.assertGreaterEqual(len(completed.split()), int(episode.target_words * 0.62))
+        request.assert_called_once()
 
     def test_dry_run_writes_series_assets(self):
         with TemporaryDirectory() as directory:

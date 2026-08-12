@@ -27,6 +27,8 @@ DEFAULT_MODEL = "gpt-5"
 MIN_EPISODE_COMPLETION_RATIO = 0.62
 MAX_BLUEPRINT_COMPLETION_TOKENS = 2_000
 MAX_EPISODE_COMPLETION_TOKENS = 6_500
+MAX_CONTINUATION_COMPLETION_TOKENS = 4_500
+MAX_EPISODE_CONTINUATIONS = 3
 MAX_PROVIDER_RETRIES = 4
 
 
@@ -243,6 +245,54 @@ def build_episode_prompt(
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+def build_episode_continuation_prompt(
+    *,
+    plan: SeriesPlan,
+    episode: EpisodePlan,
+    existing_script: str,
+    minimum_words: int,
+) -> list[dict[str, str]]:
+    """Request only the missing natural continuation of an underlength long episode."""
+    tail = existing_script[-3_500:]
+    system = """أنت تكمل نصًا صوتيًا عربيًا أصليًا لرواية تحقيق خيالية.
+أعد الاستكمال فقط، بلا عنوان أو تلخيص أو Markdown أو ملاحظات. أكمل من آخر جملة بسلاسة وباللغة نفسها، واحتفظ بالراوي الواحد والإيقاع المتصاعد. لا تكشف الحل النهائي ولا تقلّد أسلوب أي شخص، ولا تقدّم تعليمات لتنفيذ جريمة. لا تُنهِ البارت قبل أن تضيف مشاهد وأدلة وحوارًا قصيرًا كافيًا."""
+    user = f"""هذه متابعة للبارت {episode.part_number} من {plan.episode_count} في رواية «{plan.series_title}».
+اللغة: {plan.language}
+الحد الأدنى المطلوب للبارت كاملًا: {minimum_words} كلمة. النص الحالي أقصر من ذلك، لذلك أكمل السرد وحده.
+
+آخر مقطع مكتوب يجب أن تتابع منه مباشرة:
+{tail}
+
+أعد الاستكمال المنطوق فقط."""
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def complete_underlength_episode(
+    settings: WriterSettings,
+    *,
+    plan: SeriesPlan,
+    episode: EpisodePlan,
+    script: str,
+) -> str:
+    """Append provider continuations until a long episode reaches its minimum narration length."""
+    minimum_words = int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO)
+    for _ in range(MAX_EPISODE_CONTINUATIONS):
+        if word_count(script) >= minimum_words:
+            return script
+        continuation = request_chat(
+            settings,
+            build_episode_continuation_prompt(
+                plan=plan,
+                episode=episode,
+                existing_script=script,
+                minimum_words=minimum_words,
+            ),
+            max_tokens=MAX_CONTINUATION_COMPLETION_TOKENS,
+        )
+        script = f"{script.rstrip()}\n\n{continuation.strip()}"
+    return script
+
+
 def build_short_prompt(*, script: str, episode: EpisodePlan, series_title: str, kind: str, instruction: str) -> list[dict[str, str]]:
     """Build a self-contained teaser prompt without copying the full episode verbatim."""
     source_limit = 8_000
@@ -316,11 +366,18 @@ def build_series(settings: WriterSettings, *, story_id: str, requested_theme: st
             ),
             max_tokens=MAX_EPISODE_COMPLETION_TOKENS,
         )
-        if not settings.dry_run and word_count(script) < int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO):
-            raise RuntimeError(
-                f"{episode.id} is too short ({word_count(script)} words); expected at least "
-                f"{int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO)}"
+        if not settings.dry_run:
+            script = complete_underlength_episode(
+                settings,
+                plan=plan,
+                episode=episode,
+                script=script,
             )
+            if word_count(script) < int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO):
+                raise RuntimeError(
+                    f"{episode.id} is too short after continuations ({word_count(script)} words); expected at least "
+                    f"{int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO)}"
+                )
         write_text(long_path, script)
         previous_tail = script[-2_500:]
 
