@@ -1,23 +1,52 @@
-name: مصنع الملف 71 - 4 حلقات يوميا
+name: رواة الواقع - مراجعة وإنتاج
 
 on:
-  schedule:
-    # GitHub Actions evaluates cron in UTC.
-    - cron: "0 6,12,18,21 * * *"
   workflow_dispatch:
+    inputs:
+      content_format:
+        description: "اختر long للحلقة أو short للمقطع الترويجي"
+        required: true
+        default: "long"
+        type: choice
+        options:
+          - long
+          - short
+      episode_name:
+        description: "معرف آمن للملف، مثل EP01 أو EP01-HOOK-01"
+        required: true
+        default: "EP01"
+        type: string
+      script_file:
+        description: "مسار script الأصلي أو المرخّص المعتمد"
+        required: true
+        default: "content/scripts/long/EP01.txt"
+        type: string
+      title:
+        description: "العنوان المقترح للحلقة أو Short"
+        required: true
+        default: "رسالة من بيت النخيل | البارت 1 | رواية عربية مسموعة"
+        type: string
+      review_status:
+        description: "لا يبدأ الإنتاج إلا بعد اختيار approved"
+        required: true
+        default: "draft"
+        type: choice
+        options:
+          - draft
+          - approved
 
 permissions:
   contents: read
 
 concurrency:
-  group: autopilot-generation
+  group: rowat-alwaqe-production
   cancel-in-progress: false
 
 jobs:
-  build:
+  validate:
+    name: Validate production pipeline
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,18 +61,61 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Generate episode
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+  generate:
+    name: Generate reviewed artifact
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.review_status == 'approved' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Verify approved script path
+        env:
+          SCRIPT_FILE: ${{ inputs.script_file }}
+        run: |
+          case "$SCRIPT_FILE" in
+            content/scripts/long/*|content/scripts/shorts/*) ;;
+            *) echo "Script must be stored under content/scripts/long or content/scripts/shorts"; exit 1 ;;
+          esac
+          test -f "$SCRIPT_FILE"
+
+      - name: Generate reviewed episode
         env:
           PYTHONUNBUFFERED: "1"
           FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
           FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
           FISH_MODEL: s2.1-pro-free
-        run: python core/autopilot.py --episode-name "EP${{ github.run_number }}"
+          CONTENT_FORMAT: ${{ inputs.content_format }}
+          EPISODE_NAME: ${{ inputs.episode_name }}
+          EPISODE_TITLE: ${{ inputs.title }}
+          SCRIPT_FILE: ${{ inputs.script_file }}
+        run: |
+          python core/autopilot.py \
+            --script-file "$SCRIPT_FILE" \
+            --episode-name "$EPISODE_NAME" \
+            --title "$EPISODE_TITLE" \
+            --format "$CONTENT_FORMAT" \
+            --review-status approved
 
-      - name: Upload generated video
+      - name: Upload reviewed artifact
         uses: actions/upload-artifact@v4
         with:
-          name: episode-${{ github.run_number }}
-          path: storage/autopilot/*.mp4
+          name: ${{ inputs.episode_name }}-${{ inputs.content_format }}
+          path: storage/autopilot/
           if-no-files-found: error
           retention-days: 7
