@@ -7,6 +7,13 @@
       "video_id": "GuqixgSXUrs",
       "playlist_id": "PLTb92wqB4E1w",
       "updated_at": "2026-08-12T22:21:24.447853+00:00"
+    },
+    "case-001-EP01-HOOK": {
+      "status": "scheduled",
+      "scheduled_at": "2026-08-13T12:00:00Z",
+      "video_id": "hXu0E4ZsGV4",
+      "playlist_id": "",
+      "updated_at": "2026-08-12T22:50:20.416348+00:00"
     }
   }
 }
