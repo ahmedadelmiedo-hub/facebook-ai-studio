@@ -27,7 +27,7 @@ DEFAULT_MODEL = "gpt-5"
 MIN_EPISODE_COMPLETION_RATIO = 0.62
 MAX_BLUEPRINT_COMPLETION_TOKENS = 2_000
 MAX_EPISODE_COMPLETION_TOKENS = 6_500
-MAX_CONTINUATION_COMPLETION_TOKENS = 4_500
+MAX_CONTINUATION_COMPLETION_TOKENS = 2_200
 MAX_EPISODE_CONTINUATIONS = 3
 MAX_PROVIDER_RETRIES = 4
 
@@ -253,7 +253,7 @@ def build_episode_continuation_prompt(
     minimum_words: int,
 ) -> list[dict[str, str]]:
     """Request only the missing natural continuation of an underlength long episode."""
-    tail = existing_script[-3_500:]
+    tail = existing_script[-1_200:]
     system = """أنت تكمل نصًا صوتيًا عربيًا أصليًا لرواية تحقيق خيالية.
 أعد الاستكمال فقط، بلا عنوان أو تلخيص أو Markdown أو ملاحظات. أكمل من آخر جملة بسلاسة وباللغة نفسها، واحتفظ بالراوي الواحد والإيقاع المتصاعد. لا تكشف الحل النهائي ولا تقلّد أسلوب أي شخص، ولا تقدّم تعليمات لتنفيذ جريمة. لا تُنهِ البارت قبل أن تضيف مشاهد وأدلة وحوارًا قصيرًا كافيًا."""
     user = f"""هذه متابعة للبارت {episode.part_number} من {plan.episode_count} في رواية «{plan.series_title}».
