@@ -51,6 +51,7 @@ class Settings:
     fps: int
     keep_audio: bool
     retries: int
+    tts_max_characters: int
     dry_run: bool
 
 
@@ -144,6 +145,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=int(os.getenv("AUTOPILOT_TTS_RETRIES", "3")),
         help="Fish Audio attempts for transient failures",
     )
+    parser.add_argument(
+        "--tts-max-characters",
+        type=int,
+        default=int(os.getenv("AUTOPILOT_TTS_MAX_CHARACTERS", "2800")),
+        help="Maximum script characters per Fish Audio request for long narration",
+    )
     parser.add_argument("--keep-audio", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -158,6 +165,8 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         raise ValueError("fps must be between 1 and 120")
     if not 1 <= args.tts_retries <= 10:
         raise ValueError("tts retries must be between 1 and 10")
+    if not 500 <= args.tts_max_characters <= 10_000:
+        raise ValueError("tts max characters must be between 500 and 10000")
     if not args.dry_run and args.review_status != "approved":
         raise ValueError("review status must be approved before generating media")
     episode_name = sanitize_episode_name(args.episode_name)
@@ -174,6 +183,7 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         fps=args.fps,
         keep_audio=args.keep_audio,
         retries=args.tts_retries,
+        tts_max_characters=args.tts_max_characters,
         dry_run=args.dry_run,
     )
 
@@ -192,6 +202,9 @@ def fish_audio_request(settings: Settings, audio_path: Path) -> None:
             "mp3_bitrate": 128,
             "normalize": True,
             "latency": "normal",
+            "chunk_length": 300,
+            "max_new_tokens": 4096,
+            "condition_on_previous_chunks": True,
         }
     ).encode("utf-8")
     request = urllib.request.Request(
@@ -217,19 +230,104 @@ def fish_audio_request(settings: Settings, audio_path: Path) -> None:
         raise RuntimeError("Fish Audio returned an empty audio response")
 
 
+def split_script_for_tts(script: str, max_characters: int) -> list[str]:
+    """Split a long narration at paragraph or sentence boundaries for resilient TTS calls."""
+    paragraphs = [paragraph.strip() for paragraph in re.split(r"\n{2,}", script) if paragraph.strip()]
+    units: list[str] = []
+    for paragraph in paragraphs:
+        for sentence in re.split(r"(?<=[.!؟?])\s+", paragraph) or [paragraph]:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(sentence) <= max_characters:
+                units.append(sentence)
+                continue
+            piece = ""
+            for word in sentence.split():
+                candidate = f"{piece} {word}".strip()
+                if piece and len(candidate) > max_characters:
+                    units.append(piece)
+                    piece = word
+                else:
+                    piece = candidate
+            if piece:
+                units.append(piece)
+
+    chunks: list[str] = []
+    current = ""
+    for unit in units:
+        candidate = f"{current}\n\n{unit}".strip()
+        if current and len(candidate) > max_characters:
+            chunks.append(current)
+            current = unit
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    if not chunks:
+        raise ValueError("script text cannot be split into TTS chunks")
+    return chunks
+
+
+def concatenate_mp3_chunks(chunk_paths: list[Path], audio_path: Path) -> None:
+    """Join MP3 frames returned by Fish Audio in their original order."""
+    with audio_path.open("wb") as destination:
+        for chunk_path in chunk_paths:
+            destination.write(chunk_path.read_bytes())
+    if audio_path.stat().st_size == 0:
+        raise RuntimeError("Fish Audio returned empty audio chunks")
+
+
 async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
-    """Generate audio, retrying transient provider or network failures."""
-    for attempt in range(1, settings.retries + 1):
-        try:
-            await asyncio.to_thread(fish_audio_request, settings, audio_path)
-            return
-        except RuntimeError:
-            audio_path.unlink(missing_ok=True)
-            if attempt == settings.retries:
-                raise
-            delay = attempt * 2
-            LOGGER.warning("Fish Audio attempt %s/%s failed; retrying in %ss", attempt, settings.retries, delay)
-            await asyncio.sleep(delay)
+    """Generate each narration segment with retries, then assemble one MP3 for rendering."""
+    chunks = split_script_for_tts(settings.script, settings.tts_max_characters)
+    chunk_dir = audio_path.parent / f".{audio_path.stem}_chunks"
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    chunk_paths: list[Path] = []
+    try:
+        for index, chunk_text in enumerate(chunks, start=1):
+            chunk_path = chunk_dir / f"{index:04d}.mp3"
+            chunk_settings = Settings(
+                script=chunk_text,
+                voice=settings.voice,
+                model=settings.model,
+                output_dir=settings.output_dir,
+                episode_name=settings.episode_name,
+                title=settings.title,
+                profile=settings.profile,
+                review_status=settings.review_status,
+                background=settings.background,
+                fps=settings.fps,
+                keep_audio=settings.keep_audio,
+                retries=settings.retries,
+                tts_max_characters=settings.tts_max_characters,
+                dry_run=settings.dry_run,
+            )
+            for attempt in range(1, settings.retries + 1):
+                try:
+                    await asyncio.to_thread(fish_audio_request, chunk_settings, chunk_path)
+                    break
+                except RuntimeError:
+                    chunk_path.unlink(missing_ok=True)
+                    if attempt == settings.retries:
+                        raise
+                    delay = attempt * 2
+                    LOGGER.warning(
+                        "Fish Audio segment %s/%s attempt %s/%s failed; retrying in %ss",
+                        index,
+                        len(chunks),
+                        attempt,
+                        settings.retries,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+            chunk_paths.append(chunk_path)
+        concatenate_mp3_chunks(chunk_paths, audio_path)
+        LOGGER.info("Audio assembled from %s Fish Audio segment(s)", len(chunk_paths))
+    finally:
+        for chunk_path in chunk_paths:
+            chunk_path.unlink(missing_ok=True)
+        chunk_dir.rmdir() if chunk_dir.exists() and not any(chunk_dir.iterdir()) else None
 
 
 def render_video(audio_path: Path, video_path: Path, settings: Settings) -> None:

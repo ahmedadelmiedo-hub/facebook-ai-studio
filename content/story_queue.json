@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "channel_handle": "@RowatAlwaqe",
+  "channel_name": "رواة الواقع",
+  "content_policy": {
+    "genres": [
+      "تحقيق بوليسي",
+      "غموض وجريمة خيالية",
+      "ملف استخباراتي خيالي"
+    ],
+    "language_mode": "auto_fusha_or_egyptian_colloquial",
+    "narration_style": "راوٍ واحد يخاطب المستمع مباشرة، مع تفاصيل إنسانية وإيقاع متصاعد",
+    "originality_rule": "خيال أصلي فقط؛ لا قضايا حقيقية ولا تقليد لكتاب أو رواة أو قنوات",
+    "engagement_policy": "فاصل تفاعل واحد طبيعي داخل كل بارت، يطلب توقعات المشاهدين والإعجاب والاشتراك",
+    "shorts_policy": "ثلاثة Shorts مشتقة من كل بارت: Hook افتتاحي، مقطع من المنتصف، وCliffhanger بلا حرق"
+  },
+  "publication_policy": {
+    "timezone": "Africa/Cairo",
+    "long_release_time": "21:00",
+    "long_cadence_rule": "بارتان أسبوعيًا للقصة ذات 4 أو 5 بارتات، وثلاثة بارتات أسبوعيًا للقصة الأطول",
+    "shorts_rule": "Hook قبل الحلقة بست ساعات، مقطع ترويجي بعدها بعشرين ساعة، ثم Cliffhanger بعد أربع وأربعين ساعة",
+    "playlist_rule": "Playlist عامة مستقلة تُنشأ تلقائيًا لكل قصة وتضم البارتات بترتيبها"
+  },
+  "stories": [
+    {
+      "story_id": "case-001",
+      "theme": "يستلم محقق سابق تسجيلاً صوتيًا مرتبطًا بقضية أغلقها قبل سبع سنوات، فيكتشف أن الدليل الذي برّأ المشتبه به كان مزورًا.",
+      "language": "auto",
+      "status": "queued"
+    }
+  ]
+}

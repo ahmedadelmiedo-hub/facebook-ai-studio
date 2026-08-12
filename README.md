@@ -2,7 +2,7 @@
 
 منظومة Python خفيفة لإنتاج **روايات عربية مسموعة** لقناة [رواة الواقع](https://www.youtube.com/@RowatAlwaqe). تستخدم المنظومة صوت Fish Audio، وتفصل بين الحلقة الطويلة التي تبني عودة المشاهد، وShorts التي تقود المشاهد إلى الحلقة الكاملة.
 
-> المشروع **لا ينشر تلقائيًا على YouTube**. كل توليد يحتاج نصًا أصليًا أو مرخّصًا، مراجعة يدوية، واختيار `approved` صراحةً. الناتج يرفع كـGitHub Artifact فقط للمراجعة والتنزيل.
+> المشروع الآن مصمم كخط إنتاج تلقائي: يكتب النظام قصة تحقيق أصلية، يحدد عدد البارتات وموعد كل بارت، ينشئ Playlist مستقلة ومواد Shorts مشتقة، ثم يولّد الصوت والفيديو ويرفعه إلى YouTube بموعد نشر مجدول. الـShort السابق كان اختبارًا تقنيًا فقط، وليس نموذج المحتوى النهائي.
 
 ## ما الذي يدعمه المشروع؟
 
@@ -11,7 +11,7 @@
 | `long` | 1920×1080 | حلقة رواية طويلة على YouTube، مستهدفة بـ25–45 دقيقة. |
 | `short` | 1080×1920 | Hook قصير يثير الفضول ويقود إلى الحلقة الطويلة. |
 
-ينشئ المولد MP4 وسجل JSON بلا أسرار يحتوي على العنوان ونوع الفيديو وحالة المراجعة ووقت التوليد. تُحفظ النتائج في `storage/autopilot/` ولا تُرفع إلى Git.
+ينشئ المولد MP4 وسجل JSON بلا أسرار يحتوي على العنوان ونوع الفيديو ووقت التوليد. ويقسّم نصوص الروايات الطويلة إلى مقاطع TTS قبل دمجها لتقليل فشل الطلبات الطويلة. تُحفظ الوسائط في `storage/autopilot/`، بينما تُحفظ النصوص وخطة النشر وحالة YouTube في `content/production/` حتى لا يكرر النظام الرفع.
 
 ## المتطلبات
 
@@ -34,18 +34,27 @@ python -m pip install -r requirements.txt
 |---|---|
 | `FISH_API_KEY` | مصادقة Fish Audio. |
 | `FISH_VOICE_ID` | Voice ID المعتمد لصوت القناة. |
+| `SCRIPTWRITER_API_KEY` | مفتاح مزود LLM متوافق مع OpenAI لكتابة النصوص على GitHub Actions. |
+| `YOUTUBE_CLIENT_ID` | OAuth Client ID من Google Cloud. |
+| `YOUTUBE_CLIENT_SECRET` | OAuth Client Secret من Google Cloud. |
+| `YOUTUBE_REFRESH_TOKEN` | Refresh token الناتج من تفويض قناة @RowatAlwaqe مرة واحدة. |
 
 ## بنية المحتوى
 
 ```text
 content/
-├── series_manifest.json           # السلسلة والعناوين ومؤشرات القياس
-└── scripts/
-    ├── long/EP01.template.md      # قالب كتابة ومراجعة الحلقة الطويلة
-    └── shorts/README.md           # بنية hooks ومقاطع Shorts
+├── story_queue.json               # طابور القصص واللغة والأنواع المسموح بها
+├── series_manifest.json            # تعريف السلسلة القديمة ومؤشرات القياس
+├── scripts/
+│   ├── long/                      # نصوص البارتات الطويلة التي كتبها النظام
+│   └── shorts/                    # Hook ومقطع منتصف وCliffhanger لكل بارت
+└── production/<story-id>/
+    ├── story_bible.json            # مخطط القصة والشخصيات والأدلة
+    ├── series_plan.json            # عدد البارتات والمواعيد وPlaylist
+    └── publication_state.json      # IDs وحالة الرفع لمنع التكرار
 ```
 
-اكتب النص النهائي المعتمد في ملف `.txt` داخل `content/scripts/long/` أو `content/scripts/shorts/`. لا تمرر ملفات القوالب Markdown مباشرة إلى المولد.
+لا يحتاج المستخدم إلى كتابة النص يدويًا. يقرأ `core/script_writer.py` الفكرة من `content/story_queue.json`، ويكتب رواية أصلية في التحقيق البوليسي والغموض والجريمة والاستخبارات، ثم ينشئ ملفات النصوص وخطة الإنتاج.
 
 ## التشغيل المحلي
 
@@ -55,34 +64,25 @@ content/
 python -m unittest discover -s tests -v
 ```
 
-تحقق من إعدادات حلقة طويلة بلا اتصال خارجي:
+تحقق من إنشاء خطة قصة وملفاتها بلا اتصال خارجي:
 
 ```bash
-FISH_VOICE_ID=local-test python core/autopilot.py \
-  --dry-run \
-  --format long \
-  --review-status approved \
-  --episode-name EP01
+python core/automation.py --dry-run
 ```
 
-بعد اعتماد نص أصلي أو مرخّص، شغّل التوليد الحقيقي:
+ولتشغيل مهمة يومية محددة التاريخ في اختبار التخطيط:
 
 ```bash
-python core/autopilot.py \
-  --script-file content/scripts/long/EP01.txt \
-  --episode-name EP01 \
-  --title "رسالة من بيت النخيل | البارت 1 | رواية عربية مسموعة" \
-  --format long \
-  --review-status approved
+python core/automation.py --dry-run --date 2026-08-13T12:00:00Z
 ```
 
-استخدم `--format short` مع ملف hook معتمد لإنتاج Short رأسي. سيوقف المولد أي محاولة توليد فعلية ما لم تكن حالة المراجعة `approved`.
+أما التوليد الحقيقي فيحتاج إلى `FISH_API_KEY` و`FISH_VOICE_ID` و`SCRIPTWRITER_API_KEY` وبيانات YouTube. عند تشغيل المهمة اليومية، يختار النظام الأصل المستحق من الخطة، ويولّد الصوت والفيديو، ثم يرفع الحلقة الطويلة وShorts الخاصة بيومها. لا يلزم تمرير `--review-status` يدويًا في المسار التلقائي؛ فالنص يمر أولًا بفحوص البنية والطول والحقوق قبل أن يضعه المشغل في حالة إنتاج.
 
 ## GitHub Actions
 
-شغّل workflow **رواة الواقع - مراجعة وإنتاج** يدويًا من تبويب **Actions**. اختر نوع الفيديو، واسم الحلقة، ومسار النص، والعنوان، ثم اختر `approved` فقط بعد اكتمال المراجعة القانونية والتحريرية. يبدأ workflow باختبارات الوحدة، ويتحقق من أن النص داخل مجلدات المحتوى المعتمدة، ثم ينشئ Artifact قابلًا للتنزيل لمدة 7 أيام.
+يشغّل Workflow **رواة الواقع - الإنتاج والنشر التلقائي** مرة يوميًا. يستيقظ المشغل في الساعة 06:00 بتوقيت القاهرة تقريبًا، بينما يحدد `series_plan.json` الموعد الدقيق لكل أصل؛ لذلك لا يعتمد النظام على تخمين المنطقة الزمنية داخل GitHub Actions. في كل تشغيل يكتب القصة عند الحاجة، يختار البارت أو الـShort المستحق، ينتج الوسائط، يرفع الفيديو بموعده، ينشئ Playlist القصة إن لم تكن موجودة، ثم يحفظ IDs في `publication_state.json`.
 
-لا يوجد في هذه المرحلة ربط نشر آلي بـYouTube. هذا مقصود لحماية جودة العودة إلى القناة حتى نراجع أول الحلقات ونتائج أول أسبوع.
+يمكن تشغيله يدويًا مع `dry_run=true` لفحص الخطة والملفات فقط. النشر الفعلي يحتاج `YOUTUBE_REFRESH_TOKEN` بالإضافة إلى Client ID وClient Secret؛ الـRefresh token هو تفويض قناة @RowatAlwaqe وليس Service Account.
 
 ## قياس أسبوع العودة
 

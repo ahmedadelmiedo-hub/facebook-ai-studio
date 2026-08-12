@@ -10,3 +10,4 @@ __pycache__/
 # Generated media
 storage/autopilot/*.mp3
 storage/autopilot/*.mp4
+storage/autopilot/*.json
