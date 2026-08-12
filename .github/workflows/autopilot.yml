@@ -74,6 +74,8 @@ jobs:
         run: |
           if [[ "$DRY_RUN_INPUT" == "true" ]]; then
             python -m core.automation --dry-run
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            python -m core.automation --publish-first-now
           else
             python -m core.automation
           fi
