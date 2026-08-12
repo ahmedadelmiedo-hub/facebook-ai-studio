@@ -7,6 +7,7 @@ from core.script_writer import (
     WriterSettings,
     build_series,
     parse_json_response,
+    retry_after_seconds,
     sanitize_story_id,
     settings_from_args,
     build_parser,
@@ -19,6 +20,10 @@ class ScriptWriterTests(unittest.TestCase):
 
     def test_parse_json_response_accepts_fenced_object(self):
         self.assertEqual(parse_json_response("```json\n{\"ok\": true}\n```"), {"ok": True})
+
+    def test_rate_limit_delay_is_extracted(self):
+        self.assertEqual(retry_after_seconds("Please try again in 21.5s."), 23.5)
+        self.assertEqual(retry_after_seconds("rate limited"), 25.0)
 
     def test_dry_run_writes_series_assets(self):
         with TemporaryDirectory() as directory:

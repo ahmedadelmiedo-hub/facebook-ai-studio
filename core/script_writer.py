@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -26,6 +27,7 @@ DEFAULT_MODEL = "gpt-5"
 MIN_EPISODE_COMPLETION_RATIO = 0.62
 MAX_BLUEPRINT_COMPLETION_TOKENS = 2_000
 MAX_EPISODE_COMPLETION_TOKENS = 6_500
+MAX_PROVIDER_RETRIES = 4
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,12 @@ def parse_json_response(text: str) -> dict[str, Any]:
     return data
 
 
+def retry_after_seconds(details: str) -> float:
+    """Extract a provider retry delay from a rate-limit message with a safe fallback."""
+    match = re.search(r"try again in\s+([0-9.]+)s", details, flags=re.IGNORECASE)
+    return float(match.group(1)) + 2.0 if match else 25.0
+
+
 def request_chat(settings: WriterSettings, messages: list[dict[str, str]], *, max_tokens: int) -> str:
     """Call an OpenAI-compatible Chat Completions endpoint using only stdlib HTTP."""
     if settings.dry_run:
@@ -88,14 +96,21 @@ def request_chat(settings: WriterSettings, messages: list[dict[str, str]], *, ma
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=240) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        details = exc.read(1_000).decode("utf-8", errors="replace")
-        raise RuntimeError(f"script provider returned HTTP {exc.code}: {details}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"script provider network error: {exc.reason}") from exc
+    for attempt in range(MAX_PROVIDER_RETRIES):
+        try:
+            with urllib.request.urlopen(request, timeout=240) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            details = exc.read(1_000).decode("utf-8", errors="replace")
+            if exc.code == 429 and attempt < MAX_PROVIDER_RETRIES - 1:
+                time.sleep(retry_after_seconds(details))
+                continue
+            raise RuntimeError(f"script provider returned HTTP {exc.code}: {details}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"script provider network error: {exc.reason}") from exc
+    else:
+        raise RuntimeError("script provider retry loop ended unexpectedly")
 
     choices = data.get("choices", [])
     if not choices:
