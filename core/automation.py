@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,26 @@ def find_or_create_story_plan(
     raise RuntimeError("story queue has no active or queued story")
 
 
+def first_pending_long_asset(
+    assets: list[PublishableAsset],
+    state: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> PublishableAsset:
+    """Return the first unuploaded long episode and make it public immediately once."""
+    completed = state.get("assets", {})
+    candidates = [
+        asset for asset in assets
+        if asset.content_format == "long"
+        and completed.get(asset.asset_id, {}).get("status") not in DONE_STATUSES
+    ]
+    if not candidates:
+        raise RuntimeError("no pending long episode is available for the initial launch")
+    first = min(candidates, key=lambda item: (item.part_number, item.scheduled_at))
+    launch_at = (now or datetime.now(UTC)).astimezone(UTC).isoformat().replace("+00:00", "Z")
+    return replace(first, scheduled_at=launch_at)
+
+
 def render_asset(asset: PublishableAsset, *, content_root: Path, output_root: Path) -> Path:
     """Render one planned asset through the existing Fish Audio + MoviePy path."""
     args = build_autopilot_parser().parse_args(
@@ -116,12 +137,18 @@ def run_daily(
     output_root: Path,
     target_date: datetime | None = None,
     dry_run: bool = False,
+    publish_first_now: bool = False,
 ) -> list[dict[str, Any]]:
     """Produce and publish the assets due on the Cairo calendar date."""
     story_id = find_or_create_story_plan(content_root, dry_run=dry_run)
     assets = load_series_assets(content_root, story_id)
     state = load_state(content_root, story_id)
-    due = due_assets_for_date(assets, state, target_date)
+    initial_launch = publish_first_now and not state.get("assets")
+    due = (
+        [first_pending_long_asset(assets, state, now=target_date)]
+        if initial_launch
+        else due_assets_for_date(assets, state, target_date)
+    )
     if not due:
         return []
     if dry_run:
@@ -159,6 +186,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, default=Path(os.getenv("AUTOPILOT_OUTPUT_DIR", "storage/autopilot")))
     parser.add_argument("--date", help="Optional ISO timestamp for deterministic testing")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--publish-first-now",
+        action="store_true",
+        help="Publish the first long episode immediately on the initial manual launch.",
+    )
     return parser
 
 
@@ -171,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
             output_root=args.output_root,
             target_date=target,
             dry_run=args.dry_run,
+            publish_first_now=args.publish_first_now,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}")
