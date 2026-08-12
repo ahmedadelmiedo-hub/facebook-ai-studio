@@ -103,7 +103,6 @@ def request_chat(settings: WriterSettings, messages: list[dict[str, str]], *, ma
         try:
             with urllib.request.urlopen(request, timeout=240) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            break
         except urllib.error.HTTPError as exc:
             details = exc.read(1_000).decode("utf-8", errors="replace")
             if exc.code == 429 and attempt < MAX_PROVIDER_RETRIES - 1:
@@ -112,16 +111,18 @@ def request_chat(settings: WriterSettings, messages: list[dict[str, str]], *, ma
             raise RuntimeError(f"script provider returned HTTP {exc.code}: {details}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"script provider network error: {exc.reason}") from exc
-    else:
-        raise RuntimeError("script provider retry loop ended unexpectedly")
 
-    choices = data.get("choices", [])
-    if not choices:
-        raise RuntimeError("script provider returned no choices")
-    content = choices[0].get("message", {}).get("content", "")
-    if not isinstance(content, str) or not content.strip():
+        choices = data.get("choices", [])
+        content = choices[0].get("message", {}).get("content", "") if choices else ""
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+        if attempt < MAX_PROVIDER_RETRIES - 1:
+            time.sleep(3)
+            continue
+        if not choices:
+            raise RuntimeError("script provider returned no choices")
         raise RuntimeError("script provider returned an empty script")
-    return content.strip()
+    raise RuntimeError("script provider retry loop ended unexpectedly")
 
 
 def build_blueprint_prompt(*, story_id: str, requested_theme: str, language: str) -> list[dict[str, str]]:
