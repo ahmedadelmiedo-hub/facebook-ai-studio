@@ -1,0 +1,53 @@
+{
+  "series_id": "resalat_bayt_alnakheel",
+  "channel_handle": "@RowatAlwaqe",
+  "series_title": "رسالة من بيت النخيل",
+  "production_status": "planning",
+  "rights_status": "original_or_licensed_script_required",
+  "publication_mode": "manual_review_required",
+  "voice": {
+    "provider": "fish_audio",
+    "model": "s2.1-pro-free",
+    "voice_secret": "FISH_VOICE_ID"
+  },
+  "formats": {
+    "long": {
+      "canvas": "1920x1080",
+      "target_duration_minutes": [25, 45],
+      "script_directory": "content/scripts/long",
+      "playlist": "روايات عربية مسموعة"
+    },
+    "short": {
+      "canvas": "1080x1920",
+      "target_duration_seconds": [25, 55],
+      "script_directory": "content/scripts/shorts",
+      "purpose": "lead_to_long_episode"
+    }
+  },
+  "episodes": [
+    {
+      "id": "EP01",
+      "title": "رسالة من بيت النخيل | البارت 1 | رواية عربية مسموعة",
+      "thumbnail_text": "رسالة بعد 10 سنين",
+      "script_file": "content/scripts/long/EP01.txt",
+      "short_ids": ["EP01-HOOK-01", "EP01-HOOK-02", "EP01-HOOK-03"],
+      "review_status": "script_pending"
+    },
+    {
+      "id": "EP02",
+      "title": "الرسالة التي لا يجب أن يقرأها أحد | بيت النخيل 2",
+      "thumbnail_text": "احرقي الرسالة",
+      "script_file": "content/scripts/long/EP02.txt",
+      "short_ids": ["EP02-HOOK-01", "EP02-HOOK-02"],
+      "review_status": "not_started"
+    }
+  ],
+  "success_metrics": [
+    "impressions",
+    "click_through_rate",
+    "first_30_seconds_retention",
+    "average_view_duration",
+    "returning_viewers",
+    "subscribers_gained"
+  ]
+}
