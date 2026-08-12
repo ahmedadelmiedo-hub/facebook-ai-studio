@@ -23,7 +23,9 @@ class ProductionProfileTests(unittest.TestCase):
     def test_generation_requires_approved_review(self):
         parser = build_parser()
         with patch.dict(os.environ, {"FISH_VOICE_ID": "test-voice"}, clear=False):
-            args = parser.parse_args(["--format", "long", "--review-status", "draft"])
+            args = parser.parse_args(
+                ["--format", "long", "--review-status", "draft", "--voice", "test-voice"]
+            )
             with self.assertRaises(ValueError):
                 settings_from_args(args)
 
@@ -31,7 +33,16 @@ class ProductionProfileTests(unittest.TestCase):
         parser = build_parser()
         with patch.dict(os.environ, {"FISH_VOICE_ID": "test-voice"}, clear=False):
             args = parser.parse_args(
-                ["--format", "long", "--review-status", "approved", "--episode-name", "EP01"]
+                [
+                    "--format",
+                    "long",
+                    "--review-status",
+                    "approved",
+                    "--episode-name",
+                    "EP01",
+                    "--voice",
+                    "test-voice",
+                ]
             )
             settings = settings_from_args(args)
         self.assertEqual(settings.profile.canvas, (1920, 1080))
