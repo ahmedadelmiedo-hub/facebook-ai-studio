@@ -1,3 +1,2 @@
-# Runtime dependencies for the scheduled episode generator.
-edge-tts==7.2.0
+# Runtime dependency for vertical video rendering.
 moviepy==1.0.3
