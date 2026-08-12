@@ -73,9 +73,9 @@ jobs:
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
         run: |
           if [[ "$DRY_RUN_INPUT" == "true" ]]; then
-            python core/automation.py --dry-run
+            python -m core.automation --dry-run
           else
-            python core/automation.py
+            python -m core.automation
           fi
       - name: Persist generated scripts and publication state
         run: |
