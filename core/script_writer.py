@@ -24,6 +24,8 @@ from core.story_planner import EpisodePlan, SeriesPlan, build_series_plan
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-5"
 MIN_EPISODE_COMPLETION_RATIO = 0.62
+MAX_BLUEPRINT_COMPLETION_TOKENS = 2_000
+MAX_EPISODE_COMPLETION_TOKENS = 6_500
 
 
 @dataclass(frozen=True)
@@ -271,7 +273,7 @@ def build_series(settings: WriterSettings, *, story_id: str, requested_theme: st
             story_id=story_id,
             requested_theme=requested_theme,
             language=language,
-        ), max_tokens=3_000))
+        ), max_tokens=MAX_BLUEPRINT_COMPLETION_TOKENS))
     )
     plan = build_series_plan(
         story_id=story_id,
@@ -297,7 +299,7 @@ def build_series(settings: WriterSettings, *, story_id: str, requested_theme: st
                 episode=episode,
                 previous_tail=previous_tail,
             ),
-            max_tokens=10_000,
+            max_tokens=MAX_EPISODE_COMPLETION_TOKENS,
         )
         if not settings.dry_run and word_count(script) < int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO):
             raise RuntimeError(
