@@ -1,0 +1,152 @@
+{
+  "story_id": "case-001",
+  "series_title": "تسجيلات الغرفة رقم 17",
+  "language": "ar",
+  "estimated_total_words": 16000,
+  "episode_count": 4,
+  "release_days": [
+    "الاثنين",
+    "الخميس"
+  ],
+  "timezone": "Africa/Cairo",
+  "playlist_title": "تسجيلات الغرفة رقم 17 | رواية كاملة",
+  "playlist_description": "استمع إلى رواية «تسجيلات الغرفة رقم 17» كاملة مرتبة بالبارتات. فعّل الاشتراك ليصلك كل كشف جديد في القضية.",
+  "episodes": [
+    {
+      "id": "case-001-EP01",
+      "part_number": 1,
+      "title": "تسجيلات الغرفة رقم 17 | البارت 1 | رواية عربية مسموعة",
+      "target_words": 4075,
+      "target_duration_minutes": 32,
+      "long_release_at": "2026-08-13T18:00:00Z",
+      "engagement_break_after_words": 2119,
+      "engagement_goal": "ادعُ المشاهد بلغة طبيعية لكتابة نظريته حول الدليل أو المشتبه به، ثم اطلب الإعجاب والاشتراك لمتابعة كشف الحقيقة.",
+      "cliffhanger_goal": "اختم بمعلومة تقلب مسار التحقيق أو تهدد بطل القصة، من دون كشف الحل النهائي.",
+      "shorts": [
+        {
+          "asset_id": "case-001-EP01-HOOK",
+          "kind": "opening_hook",
+          "scheduled_at": "2026-08-13T12:00:00Z",
+          "target_seconds": 45,
+          "source_instruction": "اكتب Hook مستقلًا من افتتاحية البارت، يكشف الخطر أو السؤال المركزي من دون حرق الحل، وينتهي بدعوة لسماع البارت كاملًا من الـPlaylist."
+        },
+        {
+          "asset_id": "case-001-EP01-EXCERPT",
+          "kind": "midpoint_excerpt",
+          "scheduled_at": "2026-08-14T14:00:00Z",
+          "target_seconds": 55,
+          "source_instruction": "استخرج مقطعًا مشوقًا من قرب الكلمة 1711، لا يزيد عن 55 ثانية، وينتهي بسؤال يدعو المشاهد لكتابة نظريته ثم سماع الحلقة كاملة."
+        },
+        {
+          "asset_id": "case-001-EP01-CLIFFHANGER",
+          "kind": "cliffhanger",
+          "scheduled_at": "2026-08-15T14:00:00Z",
+          "target_seconds": 40,
+          "source_instruction": "استخرج مشهدًا آمنًا من قرب الكلمة 3504 قبل الانعطافة الأخيرة، ولا تكشف المفاجأة أو هوية الجاني، واختتم بدعوة لمتابعة البارت التالي من الـPlaylist."
+        }
+      ]
+    },
+    {
+      "id": "case-001-EP02",
+      "part_number": 2,
+      "title": "تسجيلات الغرفة رقم 17 | البارت 2 | رواية عربية مسموعة",
+      "target_words": 3850,
+      "target_duration_minutes": 30,
+      "long_release_at": "2026-08-17T18:00:00Z",
+      "engagement_break_after_words": 2002,
+      "engagement_goal": "ادعُ المشاهد بلغة طبيعية لكتابة نظريته حول الدليل أو المشتبه به، ثم اطلب الإعجاب والاشتراك لمتابعة كشف الحقيقة.",
+      "cliffhanger_goal": "اختم بمعلومة تقلب مسار التحقيق أو تهدد بطل القصة، من دون كشف الحل النهائي.",
+      "shorts": [
+        {
+          "asset_id": "case-001-EP02-HOOK",
+          "kind": "opening_hook",
+          "scheduled_at": "2026-08-17T12:00:00Z",
+          "target_seconds": 45,
+          "source_instruction": "اكتب Hook مستقلًا من افتتاحية البارت، يكشف الخطر أو السؤال المركزي من دون حرق الحل، وينتهي بدعوة لسماع البارت كاملًا من الـPlaylist."
+        },
+        {
+          "asset_id": "case-001-EP02-EXCERPT",
+          "kind": "midpoint_excerpt",
+          "scheduled_at": "2026-08-18T14:00:00Z",
+          "target_seconds": 55,
+          "source_instruction": "استخرج مقطعًا مشوقًا من قرب الكلمة 1617، لا يزيد عن 55 ثانية، وينتهي بسؤال يدعو المشاهد لكتابة نظريته ثم سماع الحلقة كاملة."
+        },
+        {
+          "asset_id": "case-001-EP02-CLIFFHANGER",
+          "kind": "cliffhanger",
+          "scheduled_at": "2026-08-19T14:00:00Z",
+          "target_seconds": 40,
+          "source_instruction": "استخرج مشهدًا آمنًا من قرب الكلمة 3311 قبل الانعطافة الأخيرة، ولا تكشف المفاجأة أو هوية الجاني، واختتم بدعوة لمتابعة البارت التالي من الـPlaylist."
+        }
+      ]
+    },
+    {
+      "id": "case-001-EP03",
+      "part_number": 3,
+      "title": "تسجيلات الغرفة رقم 17 | البارت 3 | رواية عربية مسموعة",
+      "target_words": 4000,
+      "target_duration_minutes": 31,
+      "long_release_at": "2026-08-20T18:00:00Z",
+      "engagement_break_after_words": 2080,
+      "engagement_goal": "ادعُ المشاهد بلغة طبيعية لكتابة نظريته حول الدليل أو المشتبه به، ثم اطلب الإعجاب والاشتراك لمتابعة كشف الحقيقة.",
+      "cliffhanger_goal": "اختم بمعلومة تقلب مسار التحقيق أو تهدد بطل القصة، من دون كشف الحل النهائي.",
+      "shorts": [
+        {
+          "asset_id": "case-001-EP03-HOOK",
+          "kind": "opening_hook",
+          "scheduled_at": "2026-08-20T12:00:00Z",
+          "target_seconds": 45,
+          "source_instruction": "اكتب Hook مستقلًا من افتتاحية البارت، يكشف الخطر أو السؤال المركزي من دون حرق الحل، وينتهي بدعوة لسماع البارت كاملًا من الـPlaylist."
+        },
+        {
+          "asset_id": "case-001-EP03-EXCERPT",
+          "kind": "midpoint_excerpt",
+          "scheduled_at": "2026-08-21T14:00:00Z",
+          "target_seconds": 55,
+          "source_instruction": "استخرج مقطعًا مشوقًا من قرب الكلمة 1680، لا يزيد عن 55 ثانية، وينتهي بسؤال يدعو المشاهد لكتابة نظريته ثم سماع الحلقة كاملة."
+        },
+        {
+          "asset_id": "case-001-EP03-CLIFFHANGER",
+          "kind": "cliffhanger",
+          "scheduled_at": "2026-08-22T14:00:00Z",
+          "target_seconds": 40,
+          "source_instruction": "استخرج مشهدًا آمنًا من قرب الكلمة 3440 قبل الانعطافة الأخيرة، ولا تكشف المفاجأة أو هوية الجاني، واختتم بدعوة لمتابعة البارت التالي من الـPlaylist."
+        }
+      ]
+    },
+    {
+      "id": "case-001-EP04",
+      "part_number": 4,
+      "title": "تسجيلات الغرفة رقم 17 | البارت 4 | رواية عربية مسموعة",
+      "target_words": 4075,
+      "target_duration_minutes": 32,
+      "long_release_at": "2026-08-24T18:00:00Z",
+      "engagement_break_after_words": 2119,
+      "engagement_goal": "ادعُ المشاهد بلغة طبيعية لكتابة نظريته حول الدليل أو المشتبه به، ثم اطلب الإعجاب والاشتراك لمتابعة كشف الحقيقة.",
+      "cliffhanger_goal": "اختم بمعلومة تقلب مسار التحقيق أو تهدد بطل القصة، من دون كشف الحل النهائي.",
+      "shorts": [
+        {
+          "asset_id": "case-001-EP04-HOOK",
+          "kind": "opening_hook",
+          "scheduled_at": "2026-08-24T12:00:00Z",
+          "target_seconds": 45,
+          "source_instruction": "اكتب Hook مستقلًا من افتتاحية البارت، يكشف الخطر أو السؤال المركزي من دون حرق الحل، وينتهي بدعوة لسماع البارت كاملًا من الـPlaylist."
+        },
+        {
+          "asset_id": "case-001-EP04-EXCERPT",
+          "kind": "midpoint_excerpt",
+          "scheduled_at": "2026-08-25T14:00:00Z",
+          "target_seconds": 55,
+          "source_instruction": "استخرج مقطعًا مشوقًا من قرب الكلمة 1711، لا يزيد عن 55 ثانية، وينتهي بسؤال يدعو المشاهد لكتابة نظريته ثم سماع الحلقة كاملة."
+        },
+        {
+          "asset_id": "case-001-EP04-CLIFFHANGER",
+          "kind": "cliffhanger",
+          "scheduled_at": "2026-08-26T14:00:00Z",
+          "target_seconds": 40,
+          "source_instruction": "استخرج مشهدًا آمنًا من قرب الكلمة 3504 قبل الانعطافة الأخيرة، ولا تكشف المفاجأة أو هوية الجاني، واختتم بدعوة لمتابعة البارت التالي من الـPlaylist."
+        }
+      ]
+    }
+  ]
+}
