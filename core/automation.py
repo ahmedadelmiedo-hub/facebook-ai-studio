@@ -53,6 +53,24 @@ def story_is_complete(content_root: Path, story_id: str) -> bool:
     )
 
 
+def story_was_built_in_dry_run(content_root: Path, story_id: str) -> bool:
+    """Return whether a prior dry-run left placeholder scripts that must not be rendered."""
+    record_path = content_root / "production" / story_id / "build_record.json"
+    if not record_path.exists():
+        return False
+    return read_json(record_path).get("mode") == "dry_run"
+
+
+def writer_settings_for(content_root: Path, *, dry_run: bool) -> WriterSettings:
+    return WriterSettings(
+        api_key=os.getenv("SCRIPTWRITER_API_KEY", "").strip(),
+        base_url=os.getenv("SCRIPTWRITER_BASE_URL", "https://api.openai.com/v1").strip(),
+        model=os.getenv("SCRIPTWRITER_MODEL", "gpt-5").strip(),
+        output_root=content_root,
+        dry_run=dry_run,
+    )
+
+
 def find_or_create_story_plan(
     content_root: Path,
     *,
@@ -66,21 +84,21 @@ def find_or_create_story_plan(
         story_id = sanitize_story_id(str(item.get("story_id", "")))
         plan_path = content_root / "production" / story_id / "series_plan.json"
         if plan_path.exists() and not story_is_complete(content_root, story_id):
+            if not dry_run and story_was_built_in_dry_run(content_root, story_id):
+                build_series(
+                    writer_settings_for(content_root, dry_run=False),
+                    story_id=story_id,
+                    requested_theme=str(item.get("theme", "")),
+                    language=str(item.get("language", "auto")),
+                )
             return story_id
 
     for item in queue["stories"]:
         if not isinstance(item, dict) or str(item.get("status", "queued")) not in {"queued", "planning"}:
             continue
         story_id = sanitize_story_id(str(item.get("story_id", "")))
-        writer_settings = WriterSettings(
-            api_key=os.getenv("SCRIPTWRITER_API_KEY", "").strip(),
-            base_url=os.getenv("SCRIPTWRITER_BASE_URL", "https://api.openai.com/v1").strip(),
-            model=os.getenv("SCRIPTWRITER_MODEL", "gpt-5").strip(),
-            output_root=content_root,
-            dry_run=dry_run,
-        )
         build_series(
-            writer_settings,
+            writer_settings_for(content_root, dry_run=dry_run),
             story_id=story_id,
             requested_theme=str(item.get("theme", "")),
             language=str(item.get("language", "auto")),
