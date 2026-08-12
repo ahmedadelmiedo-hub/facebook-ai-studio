@@ -1,19 +1,46 @@
 name: مصنع الملف 71 - 4 حلقات يوميا
+
 on:
   schedule:
-    - cron: '0 6,12,18,21 * * *'
+    # GitHub Actions evaluates cron in UTC.
+    - cron: "0 6,12,18,21 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: autopilot-generation
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - run: pip install edge-tts moviepy -q
-      - run: python core/autopilot.py
-      - uses: actions/upload-artifact@v4
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Generate episode
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: python core/autopilot.py --episode-name "EP${{ github.run_number }}"
+
+      - name: Upload generated video
+        uses: actions/upload-artifact@v4
         with:
-          name: episode
+          name: episode-${{ github.run_number }}
           path: storage/autopilot/*.mp4
+          if-no-files-found: error
+          retention-days: 7
