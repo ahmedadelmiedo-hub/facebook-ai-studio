@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "assets": {
+    "case-001-EP01": {
+      "status": "scheduled",
+      "scheduled_at": "2026-08-12T21:54:11.816892Z",
+      "video_id": "GuqixgSXUrs",
+      "playlist_id": "PLTb92wqB4E1w",
+      "updated_at": "2026-08-12T22:21:24.447853+00:00"
+    }
+  }
+}
