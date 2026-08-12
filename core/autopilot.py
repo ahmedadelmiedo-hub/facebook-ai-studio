@@ -1,4 +1,4 @@
-"""Generate a vertical Arabic episode artifact with Fish Audio TTS."""
+"""Generate reviewed Arabic audio-story artifacts with Fish Audio TTS."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import os
 import re
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 LOGGER = logging.getLogger("facebook_ai_studio.autopilot")
@@ -24,12 +25,28 @@ FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 
 
 @dataclass(frozen=True)
+class RenderProfile:
+    name: str
+    canvas: tuple[int, int]
+    intended_use: str
+
+
+RENDER_PROFILES = {
+    "short": RenderProfile("short", (1080, 1920), "YouTube Shorts discovery clip"),
+    "long": RenderProfile("long", (1920, 1080), "YouTube long-form episode"),
+}
+
+
+@dataclass(frozen=True)
 class Settings:
     script: str
     voice: str
     model: str
     output_dir: Path
     episode_name: str
+    title: str
+    profile: RenderProfile
+    review_status: str
     background: tuple[int, int, int]
     fps: int
     keep_audio: bool
@@ -45,7 +62,7 @@ def parse_color(value: str) -> tuple[int, int, int]:
         if len(hex_value) != 6:
             raise ValueError("background must use #RRGGBB or R,G,B")
         try:
-            return tuple(int(hex_value[i : i + 2], 16) for i in (0, 2, 4))
+            return tuple(int(hex_value[index : index + 2], 16) for index in (0, 2, 4))
         except ValueError as exc:
             raise ValueError("background contains invalid hexadecimal values") from exc
     try:
@@ -55,6 +72,15 @@ def parse_color(value: str) -> tuple[int, int, int]:
     if len(color) != 3 or any(channel < 0 or channel > 255 for channel in color):
         raise ValueError("RGB channels must be between 0 and 255")
     return color
+
+
+def parse_profile(value: str) -> RenderProfile:
+    """Return one of the safe, explicit render profiles."""
+    try:
+        return RENDER_PROFILES[value.strip().lower()]
+    except KeyError as exc:
+        choices = ", ".join(RENDER_PROFILES)
+        raise ValueError(f"format must be one of: {choices}") from exc
 
 
 def sanitize_episode_name(value: str) -> str:
@@ -80,14 +106,15 @@ def load_script(script_file: Path | None) -> str:
 
 
 def build_output_paths(output_dir: Path, episode_name: str) -> tuple[Path, Path]:
+    """Create deterministic media paths without committing generated media."""
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = sanitize_episode_name(episode_name)
     return output_dir / f"{stem}.mp3", output_dir / f"{stem}.mp4"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate a vertical Arabic video episode with Fish Audio.")
-    parser.add_argument("--script-file", type=Path, help="UTF-8 script file")
+    parser = argparse.ArgumentParser(description="Generate a reviewed Arabic story video with Fish Audio.")
+    parser.add_argument("--script-file", type=Path, help="Approved UTF-8 script file")
     parser.add_argument("--voice", default=os.getenv("FISH_VOICE_ID", ""), help="Fish Audio voice model ID")
     parser.add_argument("--model", default=os.getenv("FISH_MODEL", DEFAULT_MODEL))
     parser.add_argument(
@@ -96,6 +123,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path(os.getenv("AUTOPILOT_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))),
     )
     parser.add_argument("--episode-name", default=os.getenv("AUTOPILOT_EPISODE_NAME", "EP01"))
+    parser.add_argument("--title", default=os.getenv("AUTOPILOT_TITLE", ""))
+    parser.add_argument(
+        "--format",
+        choices=sorted(RENDER_PROFILES),
+        default=os.getenv("AUTOPILOT_FORMAT", "short"),
+        help="short for 1080x1920 discovery clips or long for 1920x1080 episodes",
+    )
+    parser.add_argument(
+        "--review-status",
+        choices=("draft", "approved"),
+        default=os.getenv("AUTOPILOT_REVIEW_STATUS", "draft"),
+        help="Only approved scripts may call the speech provider",
+    )
     parser.add_argument("--background", default=os.getenv("AUTOPILOT_BACKGROUND", "10,10,10"))
     parser.add_argument("--fps", type=int, default=int(os.getenv("AUTOPILOT_FPS", "24")))
     parser.add_argument(
@@ -118,12 +158,18 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         raise ValueError("fps must be between 1 and 120")
     if not 1 <= args.tts_retries <= 10:
         raise ValueError("tts retries must be between 1 and 10")
+    if not args.dry_run and args.review_status != "approved":
+        raise ValueError("review status must be approved before generating media")
+    episode_name = sanitize_episode_name(args.episode_name)
     return Settings(
         script=load_script(args.script_file),
         voice=args.voice.strip(),
         model=args.model.strip(),
         output_dir=args.output_dir,
-        episode_name=sanitize_episode_name(args.episode_name),
+        episode_name=episode_name,
+        title=args.title.strip() or episode_name,
+        profile=parse_profile(args.format),
+        review_status=args.review_status,
         background=parse_color(args.background),
         fps=args.fps,
         keep_audio=args.keep_audio,
@@ -137,7 +183,6 @@ def fish_audio_request(settings: Settings, audio_path: Path) -> None:
     api_key = os.getenv("FISH_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("FISH_API_KEY is not configured")
-
     payload = json.dumps(
         {
             "text": settings.script,
@@ -156,7 +201,7 @@ def fish_audio_request(settings: Settings, audio_path: Path) -> None:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "model": settings.model,
-            "User-Agent": "facebook-ai-studio/1.0",
+            "User-Agent": "facebook-ai-studio/1.1",
         },
         method="POST",
     )
@@ -165,18 +210,15 @@ def fish_audio_request(settings: Settings, audio_path: Path) -> None:
             audio_path.write_bytes(response.read())
     except urllib.error.HTTPError as exc:
         details = exc.read(400).decode("utf-8", errors="replace")
-        if exc.code in {400, 401, 403}:
-            raise RuntimeError(f"Fish Audio rejected the request ({exc.code}): {details}") from exc
         raise RuntimeError(f"Fish Audio returned HTTP {exc.code}: {details}") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Fish Audio network error: {exc.reason}") from exc
-
     if not audio_path.exists() or audio_path.stat().st_size == 0:
         raise RuntimeError("Fish Audio returned an empty audio response")
 
 
 async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
-    """Generate audio, retrying temporary provider or network failures."""
+    """Generate audio, retrying transient provider or network failures."""
     for attempt in range(1, settings.retries + 1):
         try:
             await asyncio.to_thread(fish_audio_request, settings, audio_path)
@@ -191,14 +233,13 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
 
 
 def render_video(audio_path: Path, video_path: Path, settings: Settings) -> None:
-    """Render a 1080x1920 background with the generated voice-over."""
+    """Render either a landscape episode or a vertical Short with voice-over."""
     try:
         from moviepy.editor import AudioFileClip, ColorClip
     except ImportError:
         from moviepy import AudioFileClip, ColorClip
-
     audio = AudioFileClip(str(audio_path))
-    video = ColorClip(size=(1080, 1920), color=settings.background, duration=audio.duration)
+    video = ColorClip(size=settings.profile.canvas, color=settings.background, duration=audio.duration)
     try:
         video = video.with_audio(audio) if hasattr(video, "with_audio") else video.set_audio(audio)
         video.write_videofile(
@@ -213,17 +254,36 @@ def render_video(audio_path: Path, video_path: Path, settings: Settings) -> None
         audio.close()
 
 
+def write_production_record(settings: Settings, video_path: Path) -> Path:
+    """Save non-secret metadata so a generated artifact remains reviewable."""
+    record_path = video_path.with_suffix(".json")
+    record = {
+        "episode_name": settings.episode_name,
+        "title": settings.title,
+        "render_profile": asdict(settings.profile),
+        "review_status": settings.review_status,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "video_path": str(video_path),
+        "script_characters": len(settings.script),
+        "voice_provider": "fish_audio",
+        "model": settings.model,
+    }
+    record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return record_path
+
+
 async def run(settings: Settings) -> Path:
     audio_path, video_path = build_output_paths(settings.output_dir, settings.episode_name)
-    LOGGER.info("Episode %s -> %s", settings.episode_name, video_path)
+    LOGGER.info("%s [%s] -> %s", settings.episode_name, settings.profile.name, video_path)
     if settings.dry_run:
         LOGGER.info("Dry run complete; no audio or video generated")
         return video_path
-
     await synthesize_audio(settings, audio_path)
     LOGGER.info("Audio generated: %s", audio_path)
     render_video(audio_path, video_path, settings)
+    record_path = write_production_record(settings, video_path)
     LOGGER.info("Video generated: %s", video_path)
+    LOGGER.info("Production record: %s", record_path)
     if not settings.keep_audio:
         audio_path.unlink(missing_ok=True)
         LOGGER.info("Temporary audio removed")
