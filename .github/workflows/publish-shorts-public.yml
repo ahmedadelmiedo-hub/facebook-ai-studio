@@ -16,9 +16,6 @@ jobs:
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-      YOUTUBE_DEFAULT_LANGUAGE: ar
-      YOUTUBE_CATEGORY_ID: "22"
-      YOUTUBE_NOTIFY_SUBSCRIBERS: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,15 +25,88 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: requirements.txt
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
       - name: Make existing Shorts public
-        run: python -m core.automation --publish-existing-shorts-now
+        run: |
+          cat > /tmp/publish_existing_shorts.py <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          state_path = Path("content/production/case-001/publication_state.json")
+          state = json.loads(state_path.read_text(encoding="utf-8"))
+          assets = state.get("assets", {})
+          targets = []
+          for asset_id, record in assets.items():
+              if not asset_id.endswith(("-HOOK", "-EXCERPT", "-CLIFFHANGER")):
+                  continue
+              if record.get("status") not in {"scheduled", "uploaded"}:
+                  continue
+              video_id = str(record.get("video_id", "")).strip()
+              if video_id:
+                  targets.append((asset_id, record, video_id))
+
+          if not targets:
+              print("No scheduled promotional Shorts need a visibility update.")
+              raise SystemExit(0)
+
+          token_payload = urllib.parse.urlencode({
+              "client_id": os.environ["YOUTUBE_CLIENT_ID"],
+              "client_secret": os.environ["YOUTUBE_CLIENT_SECRET"],
+              "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"],
+              "grant_type": "refresh_token",
+          }).encode("utf-8")
+          token_request = urllib.request.Request(
+              "https://oauth2.googleapis.com/token",
+              data=token_payload,
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+              method="POST",
+          )
+          with urllib.request.urlopen(token_request, timeout=60) as response:
+              access_token = json.loads(response.read().decode("utf-8"))["access_token"]
+
+          results = []
+          for asset_id, record, video_id in targets:
+              body = {
+                  "id": video_id,
+                  "status": {
+                      "privacyStatus": "public",
+                      "selfDeclaredMadeForKids": False,
+                      "embeddable": True,
+                      "publicStatsViewable": True,
+                  },
+              }
+              update_request = urllib.request.Request(
+                  "https://www.googleapis.com/youtube/v3/videos?part=status",
+                  data=json.dumps(body).encode("utf-8"),
+                  headers={
+                      "Authorization": f"Bearer {access_token}",
+                      "Content-Type": "application/json",
+                  },
+                  method="PUT",
+              )
+              with urllib.request.urlopen(update_request, timeout=120) as response:
+                  updated = json.loads(response.read().decode("utf-8"))
+              record["status"] = "published"
+              record["updated_at"] = datetime.now(UTC).isoformat()
+              results.append({
+                  "asset_id": asset_id,
+                  "video_id": video_id,
+                  "video_url": f"https://www.youtube.com/watch?v={video_id}",
+                  "privacy_status": updated.get("status", {}).get("privacyStatus", "public"),
+              })
+
+          state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(results, ensure_ascii=False, indent=2))
+          PY
+          python /tmp/publish_existing_shorts.py
       - name: Persist publication state
         run: |
           git config user.name "rowat-alwaqe-autopilot"
           git config user.email "actions@users.noreply.github.com"
-          git add content/production content/scripts
+          git add content/production/case-001/publication_state.json
           if git diff --cached --quiet; then
             echo "No publication state changes to commit."
           else
