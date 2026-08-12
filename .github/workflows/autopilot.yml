@@ -11,6 +11,11 @@ on:
         required: true
         default: false
         type: boolean
+      publish_short_now:
+        description: "نشر أقرب Short ترويجي مستحق فقط بدون إعادة رفع الحلقة الطويلة"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -57,6 +62,7 @@ jobs:
       YOUTUBE_DEFAULT_LANGUAGE: ar
       YOUTUBE_CATEGORY_ID: "22"
       YOUTUBE_NOTIFY_SUBSCRIBERS: "true"
+      PUBLISH_SHORT_NOW: ${{ inputs.publish_short_now }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,6 +80,8 @@ jobs:
         run: |
           if [[ "$DRY_RUN_INPUT" == "true" ]]; then
             python -m core.automation --dry-run
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$PUBLISH_SHORT_NOW" == "true" ]]; then
+            python -m core.automation --publish-short-now
           elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             python -m core.automation --publish-first-now
           else
