@@ -35,6 +35,9 @@ jobs:
       - name: Generate episode
         env:
           PYTHONUNBUFFERED: "1"
+          FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
+          FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
+          FISH_MODEL: s2.1-pro-free
         run: python core/autopilot.py --episode-name "EP${{ github.run_number }}"
 
       - name: Upload generated video
