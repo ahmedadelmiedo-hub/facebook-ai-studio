@@ -1,12 +1,15 @@
-"""Generate a vertical Arabic episode artifact from script text."""
+"""Generate a vertical Arabic episode artifact with Fish Audio TTS."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import re
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,14 +18,16 @@ DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. ج
 أمينة: الجثة بقالها 6 ساعات. شايف الرقم اللي على الحيطة؟ 71 مكتوب بدم.
 ياسر: نفس الرقم اللي كان في الملف اللي اتقفل من 5 سنين.
 الباب خبط.. ظرف على الأرض جواه صورة لنفس الشقة قبل الجريمة بساعة."""
-DEFAULT_VOICE = "ar-EG-ShakirNeural"
 DEFAULT_OUTPUT_DIR = Path("storage/autopilot")
+DEFAULT_MODEL = "s2.1-pro-free"
+FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 
 
 @dataclass(frozen=True)
 class Settings:
     script: str
     voice: str
+    model: str
     output_dir: Path
     episode_name: str
     background: tuple[int, int, int]
@@ -43,7 +48,6 @@ def parse_color(value: str) -> tuple[int, int, int]:
             return tuple(int(hex_value[i : i + 2], 16) for i in (0, 2, 4))
         except ValueError as exc:
             raise ValueError("background contains invalid hexadecimal values") from exc
-
     try:
         color = tuple(int(part.strip()) for part in value.split(","))
     except ValueError as exc:
@@ -82,9 +86,10 @@ def build_output_paths(output_dir: Path, episode_name: str) -> tuple[Path, Path]
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate a vertical Arabic video episode.")
+    parser = argparse.ArgumentParser(description="Generate a vertical Arabic video episode with Fish Audio.")
     parser.add_argument("--script-file", type=Path, help="UTF-8 script file")
-    parser.add_argument("--voice", default=os.getenv("AUTOPILOT_VOICE", DEFAULT_VOICE))
+    parser.add_argument("--voice", default=os.getenv("FISH_VOICE_ID", ""), help="Fish Audio voice model ID")
+    parser.add_argument("--model", default=os.getenv("FISH_MODEL", DEFAULT_MODEL))
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -97,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--tts-retries",
         type=int,
         default=int(os.getenv("AUTOPILOT_TTS_RETRIES", "3")),
-        help="speech-synthesis attempts for transient network failures",
+        help="Fish Audio attempts for transient failures",
     )
     parser.add_argument("--keep-audio", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -106,7 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def settings_from_args(args: argparse.Namespace) -> Settings:
     if not args.voice.strip():
-        raise ValueError("voice cannot be empty")
+        raise ValueError("Fish Audio voice ID is missing; set FISH_VOICE_ID or pass --voice")
+    if not args.model.strip():
+        raise ValueError("Fish Audio model cannot be empty")
     if not 1 <= args.fps <= 120:
         raise ValueError("fps must be between 1 and 120")
     if not 1 <= args.tts_retries <= 10:
@@ -114,6 +121,7 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
     return Settings(
         script=load_script(args.script_file),
         voice=args.voice.strip(),
+        model=args.model.strip(),
         output_dir=args.output_dir,
         episode_name=sanitize_episode_name(args.episode_name),
         background=parse_color(args.background),
@@ -124,20 +132,61 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
     )
 
 
+def fish_audio_request(settings: Settings, audio_path: Path) -> None:
+    """Call Fish Audio's JSON TTS endpoint and write the returned MP3."""
+    api_key = os.getenv("FISH_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("FISH_API_KEY is not configured")
+
+    payload = json.dumps(
+        {
+            "text": settings.script,
+            "reference_id": settings.voice,
+            "format": "mp3",
+            "sample_rate": 44100,
+            "mp3_bitrate": 128,
+            "normalize": True,
+            "latency": "normal",
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        FISH_TTS_URL,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "model": settings.model,
+            "User-Agent": "facebook-ai-studio/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            audio_path.write_bytes(response.read())
+    except urllib.error.HTTPError as exc:
+        details = exc.read(400).decode("utf-8", errors="replace")
+        if exc.code in {400, 401, 403}:
+            raise RuntimeError(f"Fish Audio rejected the request ({exc.code}): {details}") from exc
+        raise RuntimeError(f"Fish Audio returned HTTP {exc.code}: {details}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Fish Audio network error: {exc.reason}") from exc
+
+    if not audio_path.exists() or audio_path.stat().st_size == 0:
+        raise RuntimeError("Fish Audio returned an empty audio response")
+
+
 async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
     """Generate audio, retrying temporary provider or network failures."""
-    import edge_tts
-
     for attempt in range(1, settings.retries + 1):
         try:
-            await edge_tts.Communicate(settings.script, settings.voice).save(str(audio_path))
+            await asyncio.to_thread(fish_audio_request, settings, audio_path)
             return
-        except Exception:
+        except RuntimeError:
             audio_path.unlink(missing_ok=True)
             if attempt == settings.retries:
                 raise
             delay = attempt * 2
-            LOGGER.warning("Speech attempt %s/%s failed; retrying in %ss", attempt, settings.retries, delay)
+            LOGGER.warning("Fish Audio attempt %s/%s failed; retrying in %ss", attempt, settings.retries, delay)
             await asyncio.sleep(delay)
 
 
