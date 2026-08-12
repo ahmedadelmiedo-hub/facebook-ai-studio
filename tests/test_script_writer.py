@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.story_planner import build_series_plan
 from core.script_writer import (
@@ -11,6 +11,7 @@ from core.script_writer import (
     build_short_prompt,
     complete_underlength_episode,
     parse_json_response,
+    request_chat,
     retry_after_seconds,
     sanitize_story_id,
     settings_from_args,
@@ -28,6 +29,25 @@ class ScriptWriterTests(unittest.TestCase):
     def test_rate_limit_delay_is_extracted(self):
         self.assertEqual(retry_after_seconds("Please try again in 21.5s."), 23.5)
         self.assertEqual(retry_after_seconds("rate limited"), 25.0)
+
+    def test_groq_request_prioritizes_visible_script_output(self):
+        settings = WriterSettings(
+            api_key="test-key",
+            base_url="https://api.groq.com/openai/v1",
+            model="openai/gpt-oss-120b",
+            output_root=Path("content"),
+            dry_run=False,
+        )
+        response = MagicMock()
+        response.read.return_value = json.dumps({"choices": [{"message": {"content": "نص جاهز"}}]}).encode("utf-8")
+        context = MagicMock()
+        context.__enter__.return_value = response
+        with patch("core.script_writer.urllib.request.urlopen", return_value=context) as urlopen:
+            self.assertEqual(request_chat(settings, [{"role": "user", "content": "اكتب"}], max_tokens=900), "نص جاهز")
+        payload = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(payload["max_completion_tokens"], 900)
+        self.assertEqual(payload["reasoning_effort"], "low")
+        self.assertFalse(payload["include_reasoning"])
 
     def test_short_prompt_limits_source_excerpt(self):
         plan = build_series_plan(

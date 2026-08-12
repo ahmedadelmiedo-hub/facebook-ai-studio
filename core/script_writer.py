@@ -26,10 +26,10 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-5"
 MIN_EPISODE_COMPLETION_RATIO = 0.62
 MAX_BLUEPRINT_COMPLETION_TOKENS = 2_000
-MAX_EPISODE_COMPLETION_TOKENS = 6_500
-MAX_CONTINUATION_COMPLETION_TOKENS = 2_200
+MAX_EPISODE_COMPLETION_TOKENS = 5_200
+MAX_CONTINUATION_COMPLETION_TOKENS = 2_600
 MAX_EPISODE_CONTINUATIONS = 3
-MAX_SHORT_COMPLETION_TOKENS = 500
+MAX_SHORT_COMPLETION_TOKENS = 900
 MAX_PROVIDER_RETRIES = 4
 
 
@@ -83,12 +83,13 @@ def request_chat(settings: WriterSettings, messages: list[dict[str, str]], *, ma
     payload = {
         "model": settings.model,
         "messages": messages,
-        "temperature": 0.9,
+        "temperature": 0.7,
+        "max_completion_tokens": max_tokens,
     }
-    # Groq's OpenAI-compatible endpoint uses max_tokens; GPT-5-style endpoints use
-    # max_completion_tokens to keep reasoning tokens from consuming visible output.
-    token_field = "max_tokens" if "groq.com" in settings.base_url else "max_completion_tokens"
-    payload[token_field] = max_tokens
+    if "groq.com" in settings.base_url:
+        # GPT-OSS spends part of its completion budget on reasoning. Low effort plus
+        # hidden reasoning reserves the response for the spoken Arabic script.
+        payload.update({"reasoning_effort": "low", "include_reasoning": False})
     request = urllib.request.Request(
         endpoint,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
