@@ -333,7 +333,14 @@ def episode_text_for_dry_run(episode: EpisodePlan) -> str:
     )
 
 
-def build_series(settings: WriterSettings, *, story_id: str, requested_theme: str, language: str) -> SeriesPlan:
+def build_series(
+    settings: WriterSettings,
+    *,
+    story_id: str,
+    requested_theme: str,
+    language: str,
+    start_after: datetime | None = None,
+) -> SeriesPlan:
     """Create all scripts and supporting metadata for one original story series."""
     story_id = sanitize_story_id(story_id)
     blueprint = dry_run_blueprint(story_id, language) if settings.dry_run else validate_blueprint(
@@ -348,6 +355,7 @@ def build_series(settings: WriterSettings, *, story_id: str, requested_theme: st
         series_title=blueprint["series_title"],
         language=blueprint["language"],
         estimated_total_words=blueprint["estimated_total_words"],
+        start_after=start_after,
     )
 
     metadata_dir = settings.output_root / "production" / story_id

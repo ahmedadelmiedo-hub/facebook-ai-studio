@@ -75,6 +75,7 @@ def find_or_create_story_plan(
     content_root: Path,
     *,
     dry_run: bool,
+    start_after: datetime | None = None,
 ) -> str:
     """Return the first active story, creating its plan once when it is not present."""
     queue = load_queue(content_root)
@@ -90,6 +91,7 @@ def find_or_create_story_plan(
                     story_id=story_id,
                     requested_theme=str(item.get("theme", "")),
                     language=str(item.get("language", "auto")),
+                    start_after=start_after,
                 )
             return story_id
 
@@ -102,6 +104,7 @@ def find_or_create_story_plan(
             story_id=story_id,
             requested_theme=str(item.get("theme", "")),
             language=str(item.get("language", "auto")),
+            start_after=start_after,
         )
         return story_id
     raise RuntimeError("story queue has no active or queued story")
@@ -175,7 +178,11 @@ def run_daily(
     publish_short_now: bool = False,
 ) -> list[dict[str, Any]]:
     """Produce and publish the assets due on the Cairo calendar date."""
-    story_id = find_or_create_story_plan(content_root, dry_run=dry_run)
+    story_id = find_or_create_story_plan(
+        content_root,
+        dry_run=dry_run,
+        start_after=target_date,
+    )
     assets = load_series_assets(content_root, story_id)
     state = load_state(content_root, story_id)
     initial_launch = publish_first_now and not state.get("assets")

@@ -160,7 +160,7 @@ def build_series_plan(
     estimated_total_words: int,
     start_after: datetime | None = None,
 ) -> SeriesPlan:
-    """Build a release-ready plan based on the story's planned narrative size."""
+    """Build a release-ready plan, optionally anchored after a supplied UTC time."""
     if not story_id.strip():
         raise ValueError("story_id cannot be empty")
     if not series_title.strip():
@@ -174,6 +174,10 @@ def build_series_plan(
     weekdays = release_days_for(episode_count)
     budgets = split_word_budgets(estimated_total_words, episode_count)
     cursor = start_after or datetime.now(UTC)
+    if cursor.tzinfo is None:
+        cursor = cursor.replace(tzinfo=UTC)
+    else:
+        cursor = cursor.astimezone(UTC)
     episodes: list[EpisodePlan] = []
 
     for index, target_words in enumerate(budgets, start=1):
