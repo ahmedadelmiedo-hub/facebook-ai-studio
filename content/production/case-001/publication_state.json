@@ -35,6 +35,13 @@
       "video_id": "4xjkZCAlI7c",
       "playlist_id": "",
       "updated_at": "2026-08-16T13:25:09.594077+00:00"
+    },
+    "case-001-EP02": {
+      "status": "scheduled",
+      "scheduled_at": "2026-08-16T13:38:28.927374Z",
+      "video_id": "lfrZq27qVvU",
+      "playlist_id": "PLTb92wqB4E1w",
+      "updated_at": "2026-08-16T13:49:02.048733+00:00"
     }
   }
 }
