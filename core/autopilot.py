@@ -14,7 +14,9 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from core.captions import build_estimated_cues, write_arabic_ass
 from core.character_consistency import build_scene_manifest, load_character_bible
+from core.scene_renderer import render_visual_video
 
 LOGGER = logging.getLogger("facebook_ai_studio.autopilot")
 DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. جثة في شقة مهجورة في طنطا.
@@ -58,6 +60,11 @@ class Settings:
     character_file: Path | None
     scene_prompt: str
     scene_camera: str
+    scene_plan_file: Path | None
+    captions_file: Path | None
+    visual_render: bool
+    render_only: bool
+    audio_file: Path | None
 
 
 def parse_color(value: str) -> tuple[int, int, int]:
@@ -174,6 +181,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("AUTOPILOT_SCENE_CAMERA", "medium cinematic shot"),
         help="Camera and composition description for the visual scene",
     )
+    parser.add_argument("--scene-plan", type=Path, help="Validated JSON scene plan for visual rendering")
+    parser.add_argument("--captions-file", type=Path, help="ASS captions file to burn into the rendered video")
+    parser.add_argument("--visual-render", action="store_true", help="Render scene images instead of the color fallback")
+    parser.add_argument("--render-only", action="store_true", help="Render from an existing audio file without calling Fish Audio")
+    parser.add_argument("--audio-file", type=Path, help="Existing audio file used with --render-only")
     return parser
 
 
@@ -200,6 +212,12 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
             raise ValueError("scene prompt is required when --character-file is provided")
     if not scene_camera:
         raise ValueError("scene camera cannot be empty")
+    if args.visual_render and not args.scene_plan:
+        raise ValueError("--scene-plan is required with --visual-render")
+    if args.render_only and not args.audio_file:
+        raise ValueError("--audio-file is required with --render-only")
+    if args.render_only and not args.visual_render:
+        raise ValueError("--render-only requires --visual-render")
     return Settings(
         script=load_script(args.script_file),
         voice=args.voice.strip(),
@@ -218,6 +236,11 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         character_file=character_file,
         scene_prompt=scene_prompt,
         scene_camera=scene_camera,
+        scene_plan_file=args.scene_plan,
+        captions_file=args.captions_file,
+        visual_render=args.visual_render,
+        render_only=args.render_only,
+        audio_file=args.audio_file,
     )
 
 
@@ -338,6 +361,11 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                 character_file=settings.character_file,
                 scene_prompt=settings.scene_prompt,
                 scene_camera=settings.scene_camera,
+                scene_plan_file=settings.scene_plan_file,
+                captions_file=settings.captions_file,
+                visual_render=settings.visual_render,
+                render_only=settings.render_only,
+                audio_file=settings.audio_file,
             )
             for attempt in range(1, settings.retries + 1):
                 try:
@@ -433,13 +461,35 @@ async def run(settings: Settings) -> Path:
     if settings.dry_run:
         LOGGER.info("Dry run complete; no audio or video generated")
         return video_path
-    await synthesize_audio(settings, audio_path)
-    LOGGER.info("Audio generated: %s", audio_path)
+    if settings.render_only:
+        audio_path = settings.audio_file.resolve()
+        if not audio_path.is_file():
+            raise FileNotFoundError(f"audio file not found: {audio_path}")
+        LOGGER.info("Using existing audio: %s", audio_path)
+    else:
+        await synthesize_audio(settings, audio_path)
+        LOGGER.info("Audio generated: %s", audio_path)
     manifest_path = write_visual_scene_manifest(settings, video_path)
     if manifest_path:
         LOGGER.info("Visual scene manifest generated: %s", manifest_path)
-        LOGGER.warning("Character integration is manifest-only until a real image provider is configured; current renderer remains the safe color fallback")
-    render_video(audio_path, video_path, settings)
+    if settings.visual_render:
+        captions_path = settings.captions_file
+        if captions_path is None:
+            captions_path = video_path.with_suffix(".ass")
+            duration = __import__("core.scene_renderer", fromlist=["probe_duration"]).probe_duration(audio_path)
+            cues = build_estimated_cues(settings.script, duration)
+            write_arabic_ass(cues, captions_path, vertical=settings.profile.name == "short")
+        render_visual_video(
+            scene_plan=settings.scene_plan_file,
+            audio_path=audio_path,
+            captions_path=captions_path,
+            output_path=video_path,
+            profile=settings.profile.name,
+            fps=settings.fps,
+            fonts_dir=Path("/usr/share/fonts/truetype/noto"),
+        )
+    else:
+        render_video(audio_path, video_path, settings)
     record_path = write_production_record(settings, video_path)
     LOGGER.info("Video generated: %s", video_path)
     LOGGER.info("Production record: %s", record_path)
