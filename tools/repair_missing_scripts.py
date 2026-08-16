@@ -208,6 +208,8 @@ def main(argv: list[str] | None = None) -> int:
             previous_tail = episode_script[-2_500:]
         if episode.id != target_episode_id:
             continue
+        if args.asset_id == target_episode_id:
+            return 0
         short_by_id = {short.asset_id: short for short in episode.shorts}
         short = short_by_id.get(args.asset_id)
         if short is None:

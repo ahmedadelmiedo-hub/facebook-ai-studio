@@ -176,6 +176,7 @@ def run_daily(
     dry_run: bool = False,
     publish_first_now: bool = False,
     publish_short_now: bool = False,
+    publish_long_now: bool = False,
 ) -> list[dict[str, Any]]:
     """Produce and publish the assets due on the Cairo calendar date."""
     story_id = find_or_create_story_plan(
@@ -186,7 +187,9 @@ def run_daily(
     assets = load_series_assets(content_root, story_id)
     state = load_state(content_root, story_id)
     initial_launch = publish_first_now and not state.get("assets")
-    if publish_short_now:
+    if publish_long_now:
+        due = [first_pending_long_asset(assets, state, now=target_date)]
+    elif publish_short_now:
         due = [first_pending_short_asset(assets, state)]
     elif initial_launch:
         due = [first_pending_long_asset(assets, state, now=target_date)]
@@ -239,6 +242,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Publish the earliest pending promotional Short without re-uploading long episodes.",
     )
+    parser.add_argument(
+        "--publish-long-now",
+        action="store_true",
+        help="Publish the earliest pending long episode immediately as public.",
+    )
     return parser
 
 
@@ -253,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             publish_first_now=args.publish_first_now,
             publish_short_now=args.publish_short_now,
+            publish_long_now=args.publish_long_now,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}")

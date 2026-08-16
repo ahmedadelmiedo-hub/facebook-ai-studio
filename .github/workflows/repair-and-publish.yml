@@ -13,6 +13,11 @@ on:
         required: true
         default: "case-001-EP02-HOOK"
         type: string
+      publish_long_now:
+        description: "رفع الحلقة الطويلة Public فورًا بدل جدولتها"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -74,7 +79,11 @@ jobs:
         run: python tools/repair_missing_scripts.py --story-id "${{ inputs.story_id }}" --asset-id "${{ inputs.asset_id }}"
       - name: Render and publish selected asset
         run: |
-          python -m core.automation --publish-short-now
+          if [[ "${{ inputs.publish_long_now }}" == "true" ]]; then
+            python -m core.automation --publish-long-now
+          else
+            python -m core.automation --publish-short-now
+          fi
       - name: Persist repaired scripts and publication state
         run: |
           git config user.name "rowat-alwaqe-autopilot"
