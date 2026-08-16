@@ -1,0 +1,49 @@
+name: Avatar smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: "HTTPS URL for the Nour reference image"
+        required: true
+        default: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663829408040/fnhSKHjBzLDTeCTu.png"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  avatar-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      D_ID_API_KEY: ${{ secrets.D_ID_API_KEY }}
+      D_ID_SOURCE_URL: ${{ inputs.source_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify secret presence without printing it
+        run: test -n "$D_ID_API_KEY"
+      - name: Download Arabic demo audio
+        run: |
+          mkdir -p storage/autopilot/avatar-smoke
+          curl --fail --location --max-time 60 \
+            "https://files.manuscdn.com/user_upload_by_module/session_file/310519663829408040/PqOJXoBNxVaZGtpz.wav" \
+            --output storage/autopilot/avatar-smoke/visual-preview.wav
+      - name: Generate talking-avatar segment
+        run: |
+          python tools/run_avatar_segment.py \
+            --audio storage/autopilot/avatar-smoke/visual-preview.wav \
+            --source-url "$D_ID_SOURCE_URL" \
+            --output storage/autopilot/avatar-smoke/nour-avatar.mp4
+      - name: Upload smoke-test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nour-avatar-smoke-test
+          path: storage/autopilot/avatar-smoke/nour-avatar.mp4
