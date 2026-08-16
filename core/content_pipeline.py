@@ -153,8 +153,10 @@ def mark_uploaded(
 ) -> dict[str, Any]:
     """Record a successful API response so the next daily run does not upload twice."""
     assets = state.setdefault("assets", {})
+    scheduled_at = datetime.fromisoformat(asset.scheduled_at.replace("Z", "+00:00")).astimezone(UTC)
+    status = "scheduled" if scheduled_at > datetime.now(UTC) else "published"
     assets[asset.asset_id] = {
-        "status": "scheduled",
+        "status": status,
         "scheduled_at": asset.scheduled_at,
         "video_id": video_id,
         "playlist_id": playlist_id,
