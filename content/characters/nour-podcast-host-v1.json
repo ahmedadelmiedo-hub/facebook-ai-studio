@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "character_id": "podcast_host_nour_v1",
+  "display_name": "نور - مذيعة بودكاست التحقيقات",
+  "character_type": "stylized_cartoon_podcast_host",
+  "language": "ar",
+  "description": "مذيعة بودكاست كرتونية عربية تقدم قصص التحقيق والغموض بأسلوب هادئ وذكي.",
+  "identity_anchors": {
+    "age_appearance": "late 20s",
+    "gender_presentation": "female",
+    "face_shape": "soft oval face",
+    "skin_tone": "warm medium olive skin",
+    "eyes": "large almond-shaped hazel eyes, attentive expression",
+    "eyebrows": "thick gently arched dark eyebrows",
+    "hair": "short dark curly bob, shoulder-length, one curl falling near the right cheek",
+    "facial_features": "small rounded nose, defined cheekbones, friendly confident smile",
+    "body_build": "average build, relaxed upright posture",
+    "signature_detail": "small turquoise star-shaped earring in the left ear"
+  },
+  "wardrobe_anchors": {
+    "default_outfit": "mustard-yellow blazer over a dark teal shirt",
+    "accessories": [
+      "thin round glasses",
+      "turquoise star-shaped left earring",
+      "small black studio headphones when recording"
+    ],
+    "allowed_variations": [
+      "dark teal blazer for serious episodes",
+      "cream scarf for winter scenes"
+    ],
+    "forbidden_variations": [
+      "different hair color",
+      "long straight hair",
+      "large earrings",
+      "sunglasses",
+      "military uniform",
+      "logos or branded clothing"
+    ]
+  },
+  "personality_and_expression": {
+    "default_mood": "calm, observant, intelligent, approachable",
+    "allowed_expressions": [
+      "focused investigation",
+      "quiet surprise",
+      "concern",
+      "subtle suspicion",
+      "warm invitation to the audience"
+    ],
+    "avoid": [
+      "exaggerated comedy face",
+      "extreme anger",
+      "horror distortion",
+      "empty emotionless stare"
+    ]
+  },
+  "visual_style": {
+    "style": "high-quality 2D cinematic cartoon illustration",
+    "linework": "clean expressive linework with soft painterly shading",
+    "palette": [
+      "mustard yellow",
+      "dark teal",
+      "warm cream",
+      "charcoal gray",
+      "muted turquoise"
+    ],
+    "lighting": "warm studio key light with soft teal rim light",
+    "camera_language": [
+      "medium shot",
+      "three-quarter portrait",
+      "close-up for emotional reveals",
+      "over-the-shoulder shot toward evidence"
+    ],
+    "backgrounds": [
+      "cozy podcast studio",
+      "old archive room",
+      "desk with microphone and case files",
+      "dim library with warm practical lights"
+    ]
+  },
+  "prompt_template": {
+    "identity": "same character Nour, late-20s Arab female cartoon podcast host, soft oval warm olive face, large hazel almond eyes, thick arched dark eyebrows, short dark curly bob with one curl near the right cheek, thin round glasses, turquoise star-shaped earring in the left ear",
+    "wardrobe": "mustard-yellow blazer over dark teal shirt, small black studio headphones when recording",
+    "style": "high-quality 2D cinematic cartoon illustration, clean expressive linework, soft painterly shading, warm studio key light, soft teal rim light, consistent color palette",
+    "scene_placeholder": "{{SCENE_DESCRIPTION}}",
+    "camera_placeholder": "{{CAMERA_AND_COMPOSITION}}",
+    "positive_prompt": "{{IDENTITY}}; {{WARDROBE}}; {{STYLE}}; scene: {{SCENE_DESCRIPTION}}; camera: {{CAMERA_AND_COMPOSITION}}; no readable text in the image",
+    "negative_prompt": "different person, different face, different hair, long straight hair, different eye color, missing glasses, missing turquoise earring, wrong blazer color, extra fingers, deformed hands, duplicate person, distorted face, blurry face, low detail, photorealistic style, 3D render, watermark, logo, readable text, random letters, cropped head"
+  },
+  "reference_assets": {
+    "master_image": "storage/references/nour-master-v1.png",
+    "character_sheet": "storage/references/nour-sheet-v1.png",
+    "face_closeup": "storage/references/nour-face-v1.png",
+    "full_body": "storage/references/nour-full-body-v1.png",
+    "reference_requirements": [
+      "front portrait",
+      "three-quarter portrait",
+      "left and right profile",
+      "medium shot with default wardrobe",
+      "full-body pose",
+      "neutral, focused, surprised, and concerned expressions"
+    ]
+  },
+  "generation": {
+    "default_seed": 2741996,
+    "allowed_seeds": [2741996, 2741997, 2741998],
+    "reference_strength": 0.72,
+    "style_strength": 0.65,
+    "adapter": "reference_image_or_ip_adapter",
+    "adapter_weight_range": [0.6, 0.85],
+    "controlnet": {
+      "enabled": false,
+      "mode": "openpose_or_depth",
+      "weight": 0.65
+    },
+    "resolution": {
+      "long": [1920, 1080],
+      "short": [1080, 1920],
+      "reference": [1024, 1024]
+    },
+    "steps": 30,
+    "guidance_scale": 6.5,
+    "sampler": "provider_default"
+  },
+  "quality_gate": {
+    "required_identity_features": [
+      "short dark curly bob",
+      "hazel eyes",
+      "thin round glasses",
+      "turquoise star earring on the left ear",
+      "mustard-yellow blazer or approved variation"
+    ],
+    "reject_if": [
+      "face identity visibly changes",
+      "hair becomes straight or long",
+      "glasses disappear in a close-up",
+      "left earring is missing in a visible profile",
+      "watermark or unwanted text appears",
+      "hands or face are visibly deformed"
+    ],
+    "manual_review_required": true,
+    "minimum_visual_score": 0.78
+  },
+  "cache": {
+    "root": "storage/visual-cache/podcast_host_nour_v1",
+    "key_fields": [
+      "character_id",
+      "version",
+      "reference_sha256",
+      "prompt",
+      "negative_prompt",
+      "seed",
+      "adapter",
+      "adapter_weight",
+      "model",
+      "model_revision",
+      "width",
+      "height"
+    ],
+    "file_pattern": "{generation_key}.png"
+  },
+  "sample_scenes": [
+    {
+      "scene_id": "studio-intro",
+      "description": "Nour sits behind a wooden podcast desk, speaking into a black broadcast microphone, an old case file and cassette recorder beside her, cozy mystery studio, warm practical lamp",
+      "camera": "medium three-quarter shot, character on the right third, evidence on the left foreground",
+      "motion": "slow push-in"
+    },
+    {
+      "scene_id": "archive-discovery",
+      "description": "Nour examines a damaged cassette inside a dusty archive room, shelves of folders behind her, a narrow beam of light crossing the desk, quiet suspense",
+      "camera": "over-the-shoulder medium shot, cassette in sharp foreground, Nour visible in profile",
+      "motion": "slow pan from cassette toward her face"
+    },
+    {
+      "scene_id": "suspicious-reveal",
+      "description": "close-up of Nour looking toward an unseen doorway after hearing a sound, subtle concern, warm light fading into teal shadows, no horror distortion",
+      "camera": "close-up, eyes in the upper third, shallow depth of field",
+      "motion": "very slow zoom toward the eyes"
+    }
+  ],
+  "license_and_provenance": {
+    "character_owner": "project_owner",
+    "reference_images_source": "original_project_assets",
+    "third_party likeness": false,
+    "notes": "Use only with assets and models whose licenses permit this production workflow."
+  }
+}

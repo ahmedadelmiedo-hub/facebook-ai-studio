@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from core.character_consistency import build_scene_manifest, load_character_bible
+
 LOGGER = logging.getLogger("facebook_ai_studio.autopilot")
 DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. جثة في شقة مهجورة في طنطا.
 أمينة: الجثة بقالها 6 ساعات. شايف الرقم اللي على الحيطة؟ 71 مكتوب بدم.
@@ -53,6 +55,9 @@ class Settings:
     retries: int
     tts_max_characters: int
     dry_run: bool
+    character_file: Path | None
+    scene_prompt: str
+    scene_camera: str
 
 
 def parse_color(value: str) -> tuple[int, int, int]:
@@ -153,6 +158,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--keep-audio", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--character-file",
+        type=Path,
+        default=Path(os.getenv("AUTOPILOT_CHARACTER_FILE")) if os.getenv("AUTOPILOT_CHARACTER_FILE") else None,
+        help="Character Bible JSON used to build a provider-neutral visual scene manifest",
+    )
+    parser.add_argument(
+        "--scene-prompt",
+        default=os.getenv("AUTOPILOT_SCENE_PROMPT", ""),
+        help="Visual scene description to combine with the character identity",
+    )
+    parser.add_argument(
+        "--scene-camera",
+        default=os.getenv("AUTOPILOT_SCENE_CAMERA", "medium cinematic shot"),
+        help="Camera and composition description for the visual scene",
+    )
     return parser
 
 
@@ -170,6 +191,15 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
     if not args.dry_run and args.review_status != "approved":
         raise ValueError("review status must be approved before generating media")
     episode_name = sanitize_episode_name(args.episode_name)
+    character_file = args.character_file
+    scene_prompt = args.scene_prompt.strip()
+    scene_camera = args.scene_camera.strip()
+    if character_file:
+        load_character_bible(character_file)
+        if not scene_prompt:
+            raise ValueError("scene prompt is required when --character-file is provided")
+    if not scene_camera:
+        raise ValueError("scene camera cannot be empty")
     return Settings(
         script=load_script(args.script_file),
         voice=args.voice.strip(),
@@ -185,6 +215,9 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         retries=args.tts_retries,
         tts_max_characters=args.tts_max_characters,
         dry_run=args.dry_run,
+        character_file=character_file,
+        scene_prompt=scene_prompt,
+        scene_camera=scene_camera,
     )
 
 
@@ -302,6 +335,9 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                 retries=settings.retries,
                 tts_max_characters=settings.tts_max_characters,
                 dry_run=settings.dry_run,
+                character_file=settings.character_file,
+                scene_prompt=settings.scene_prompt,
+                scene_camera=settings.scene_camera,
             )
             for attempt in range(1, settings.retries + 1):
                 try:
@@ -352,11 +388,32 @@ def render_video(audio_path: Path, video_path: Path, settings: Settings) -> None
         audio.close()
 
 
+def write_visual_scene_manifest(settings: Settings, video_path: Path) -> Path | None:
+    """Build visual metadata from character.json without invoking an image provider."""
+    if not settings.character_file:
+        return None
+    character = load_character_bible(settings.character_file)
+    manifest = build_scene_manifest(
+        character,
+        settings.scene_prompt,
+        settings.scene_camera,
+        seed=None,
+        width=settings.profile.canvas[0],
+        height=settings.profile.canvas[1],
+    )
+    manifest_path = video_path.with_suffix(".scene.json")
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return manifest_path
+
+
 def write_production_record(settings: Settings, video_path: Path) -> Path:
     """Save non-secret metadata so a generated artifact remains reviewable."""
     record_path = video_path.with_suffix(".json")
     record = {
         "episode_name": settings.episode_name,
+        "character_file": str(settings.character_file) if settings.character_file else None,
+        "scene_prompt": settings.scene_prompt or None,
+        "scene_camera": settings.scene_camera if settings.character_file else None,
         "title": settings.title,
         "render_profile": asdict(settings.profile),
         "review_status": settings.review_status,
@@ -378,6 +435,10 @@ async def run(settings: Settings) -> Path:
         return video_path
     await synthesize_audio(settings, audio_path)
     LOGGER.info("Audio generated: %s", audio_path)
+    manifest_path = write_visual_scene_manifest(settings, video_path)
+    if manifest_path:
+        LOGGER.info("Visual scene manifest generated: %s", manifest_path)
+        LOGGER.warning("Character integration is manifest-only until a real image provider is configured; current renderer remains the safe color fallback")
     render_video(audio_path, video_path, settings)
     record_path = write_production_record(settings, video_path)
     LOGGER.info("Video generated: %s", video_path)
