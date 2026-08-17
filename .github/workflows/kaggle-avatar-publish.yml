@@ -97,6 +97,8 @@ jobs:
             --episode-name "$INPUT_EPISODE" \
             --output-dir storage/autopilot/github-avatar-audio \
             --character-file content/characters/nour-podcast-host-v1.json \
+            --scene-prompt "Nour narrates the case from her podcast studio" \
+            --scene-camera "cinematic medium shot with microphone and evidence board" \
             --avatar-max-characters "$INPUT_MAX_CHARACTERS" \
             --review-status approved \
             --keep-audio
