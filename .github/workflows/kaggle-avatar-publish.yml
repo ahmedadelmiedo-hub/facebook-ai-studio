@@ -112,8 +112,9 @@ jobs:
           AUDIO_DATASET_ID="${KERNEL_ID%/*}/${KERNEL_SLUG}-audio"
           printf '%s\n' "KAGGLE_AUDIO_DATASET_ID=$AUDIO_DATASET_ID" >> "$GITHUB_ENV"
           jq -n \
+            --arg id "$AUDIO_DATASET_ID" \
             --arg title "${KERNEL_SLUG}-audio" \
-            '{title:$title, id:$title, subtitle:"Private precomputed avatar audio", description:"Private audio segments for one Rowat Alwaqe SadTalker render.", licenses:[{name:"other"}]}' \
+            '{title:$title, id:$id, subtitle:"Private precomputed avatar audio", description:"Private audio segments for one Rowat Alwaqe SadTalker render.", licenses:[{name:"other"}]}' \
             > .kaggle-audio-dataset/dataset-metadata.json
           kaggle datasets create -p .kaggle-audio-dataset --dir-mode zip
       - name: Prepare Kaggle kernel package
