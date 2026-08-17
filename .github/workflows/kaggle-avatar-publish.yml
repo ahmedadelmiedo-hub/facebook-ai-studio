@@ -117,6 +117,25 @@ jobs:
             '{title:$title, id:$id, subtitle:"Private precomputed avatar audio", description:"Private audio segments for one Rowat Alwaqe SadTalker render.", licenses:[{name:"other"}]}' \
             > .kaggle-audio-dataset/dataset-metadata.json
           kaggle datasets create -p .kaggle-audio-dataset --dir-mode zip
+          dataset_ready=false
+          for attempt in $(seq 1 12); do
+            dataset_status="$(kaggle datasets status -d "$AUDIO_DATASET_ID" 2>&1 || true)"
+            echo "Dataset status check ${attempt}/12: ${dataset_status}"
+            normalized_status="$(printf '%s' "$dataset_status" | tr '[:upper:]' '[:lower:]')"
+            if printf '%s' "$normalized_status" | grep -Eqi 'ready|complete|success'; then
+              dataset_ready=true
+              break
+            fi
+            if printf '%s' "$normalized_status" | grep -Eqi 'error|failed|invalid|not found|unauthorized'; then
+              echo "Kaggle audio dataset did not become available: ${dataset_status}"
+              exit 1
+            fi
+            sleep 15
+          done
+          if [ "$dataset_ready" != "true" ]; then
+            echo "Kaggle audio dataset was not ready after waiting."
+            exit 1
+          fi
       - name: Prepare Kaggle kernel package
         env:
           INPUT_SCRIPT: ${{ inputs.script_file }}
@@ -127,6 +146,8 @@ jobs:
         run: |
           rm -rf .kaggle-kernel kaggle-output
           mkdir -p .kaggle-kernel kaggle-output
+          AUDIO_DATASET_ID="$KAGGLE_AUDIO_DATASET_ID"
+          test -n "$AUDIO_DATASET_ID"
           KERNEL_SLUG="${KERNEL_ID#*/}"
           cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
           jq -n \
@@ -136,8 +157,9 @@ jobs:
             --argjson max_characters "$INPUT_MAX_CHARACTERS" \
             --argjson run_short "$INPUT_RUN_SHORT" \
             --arg accelerator "$INPUT_ACCELERATOR" \
+            --arg audio_dataset_id "$AUDIO_DATASET_ID" \
             --arg audio_dir "/kaggle/input/${KERNEL_SLUG}-audio" \
-            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator, audio_dir:$audio_dir, voice_id:"precomputed"}' \
+            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator, audio_dataset_id:$audio_dataset_id, audio_dir:$audio_dir, voice_id:"precomputed"}' \
             > .kaggle-kernel/job_config.json
           KERNEL_SLUG="${KERNEL_ID#*/}"
           jq -n \
