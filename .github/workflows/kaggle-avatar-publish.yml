@@ -114,7 +114,9 @@ jobs:
           rm -rf .kaggle-kernel kaggle-output
           mkdir -p .kaggle-kernel kaggle-output
           cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
-          zip -q -j .kaggle-kernel/audio_segments.zip storage/autopilot/github-avatar-audio/*.mp3
+          python tools/embed_avatar_audio_in_notebook.py \
+            --notebook .kaggle-kernel/sadtalker_kaggle_gpu.ipynb \
+            --audio-dir storage/autopilot/github-avatar-audio
           jq -n \
             --arg script "$INPUT_SCRIPT" \
             --arg episode "$INPUT_EPISODE" \
