@@ -1,13 +1,14 @@
-"""Talking-avatar provider adapters for audio-driven character segments."""
-
 from __future__ import annotations
 
 import base64
 import os
+import shutil
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import requests
 
@@ -21,6 +22,20 @@ class AvatarJob:
     job_id: str
     status: str
     result_url: str | None = None
+
+
+class AvatarProvider(Protocol):
+    """Provider-neutral interface used by the autopilot segment renderer."""
+
+    def create_talking_segment(
+        self,
+        *,
+        audio_path: Path,
+        output_path: Path,
+        expression_events: list[dict[str, Any]] | None = None,
+        name: str | None = None,
+    ) -> Path:
+        ...
 
 
 class DIDAvatarProvider:
@@ -150,3 +165,120 @@ class DIDAvatarProvider:
         audio_url = self.upload_audio(audio_path)
         job = self.create_talk(audio_url=audio_url, expression_events=expression_events, name=name)
         return self.wait_for_result(job, output_path)
+
+
+class SadTalkerProvider:
+    """Local SadTalker CLI adapter for image-plus-audio talking-head generation."""
+
+    def __init__(
+        self,
+        source_image: Path | str | None = None,
+        *,
+        repository_root: Path | str | None = None,
+        python_executable: Path | str | None = None,
+        enhancer: str | None = None,
+        still: bool | None = None,
+        timeout_seconds: int = 1800,
+    ) -> None:
+        image_value = source_image or os.getenv("AVATAR_SOURCE_IMAGE", "")
+        self.source_image = Path(str(image_value)).expanduser() if str(image_value).strip() else None
+        if self.source_image is None or not self.source_image.is_file():
+            raise AvatarProviderError("AVATAR_SOURCE_IMAGE must point to an existing local image")
+
+        root_value = repository_root or os.getenv("SADTALKER_ROOT", "")
+        self.repository_root = Path(str(root_value)).expanduser() if str(root_value).strip() else None
+        if self.repository_root is None:
+            raise AvatarProviderError("SADTALKER_ROOT must point to the local SadTalker repository")
+        self.inference_script = self.repository_root / "inference.py"
+        if not self.inference_script.is_file():
+            raise AvatarProviderError(f"SadTalker inference.py not found: {self.inference_script}")
+
+        executable = python_executable or os.getenv("SADTALKER_PYTHON", sys.executable)
+        self.python_executable = str(Path(str(executable)).expanduser())
+        if not Path(self.python_executable).is_file() and shutil.which(self.python_executable) is None:
+            raise AvatarProviderError(f"SadTalker Python executable not found: {self.python_executable}")
+
+        configured_enhancer = enhancer if enhancer is not None else os.getenv("SADTALKER_ENHANCER", "")
+        self.enhancer = configured_enhancer.strip()
+        if still is None:
+            self.still = os.getenv("SADTALKER_STILL", "0").strip().lower() in {"1", "true", "yes", "on"}
+        else:
+            self.still = still
+        self.timeout_seconds = timeout_seconds
+
+    def _command(self, audio_path: Path, result_dir: Path) -> list[str]:
+        command = [
+            self.python_executable,
+            str(self.inference_script),
+            "--driven_audio",
+            str(audio_path.resolve()),
+            "--source_image",
+            str(self.source_image.resolve()),
+            "--result_dir",
+            str(result_dir.resolve()),
+        ]
+        if self.enhancer:
+            command.extend(["--enhancer", self.enhancer])
+        if self.still:
+            command.append("--still")
+        return command
+
+    def create_talking_segment(
+        self,
+        *,
+        audio_path: Path,
+        output_path: Path,
+        expression_events: list[dict[str, Any]] | None = None,
+        name: str | None = None,
+    ) -> Path:
+        del expression_events
+        if not audio_path.is_file():
+            raise FileNotFoundError(f"avatar audio not found: {audio_path}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        result_dir = output_path.parent / f".{output_path.stem}_sadtalker"
+        if result_dir.exists():
+            shutil.rmtree(result_dir)
+        result_dir.mkdir(parents=True, exist_ok=True)
+        if name:
+            (result_dir / "segment_name.txt").write_text(name, encoding="utf-8")
+
+        try:
+            completed = subprocess.run(
+                self._command(audio_path, result_dir),
+                cwd=self.repository_root,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AvatarProviderError(f"SadTalker timed out after {self.timeout_seconds}s") from exc
+        except OSError as exc:
+            raise AvatarProviderError(f"SadTalker process could not start: {exc}") from exc
+
+        if completed.returncode != 0:
+            details = (completed.stderr or completed.stdout or "unknown SadTalker error").strip()
+            raise AvatarProviderError(f"SadTalker failed ({completed.returncode}): {details[-1200:]}")
+
+        candidates = sorted(result_dir.rglob("*.mp4"), key=lambda item: item.stat().st_mtime, reverse=True)
+        if not candidates:
+            raise AvatarProviderError(f"SadTalker completed without an MP4 in {result_dir}")
+        shutil.copyfile(candidates[0], output_path)
+        if not output_path.is_file() or output_path.stat().st_size == 0:
+            raise AvatarProviderError("SadTalker returned an empty video")
+        return output_path
+
+
+def build_avatar_provider(
+    provider: str | None = None,
+    *,
+    source_url: str | None = None,
+    source_image: Path | str | None = None,
+) -> AvatarProvider:
+    """Build the configured provider without exposing provider secrets."""
+    selected = (provider or os.getenv("AVATAR_PROVIDER", "d_id")).strip().lower().replace("-", "_")
+    if selected in {"d_id", "did"}:
+        return DIDAvatarProvider(source_url=source_url)
+    if selected in {"sadtalker", "sad_talker"}:
+        return SadTalkerProvider(source_image=source_image)
+    raise AvatarProviderError(f"unsupported AVATAR_PROVIDER: {selected}")

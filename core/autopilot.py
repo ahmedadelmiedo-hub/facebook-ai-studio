@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from core.avatar_animation import DIDAvatarProvider
+from core.avatar_animation import build_avatar_provider
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.character_consistency import build_scene_manifest, load_character_bible
 from core.performance_planner import split_script_into_performance_segments, write_performance_plan
@@ -68,7 +68,9 @@ class Settings:
     render_only: bool
     audio_file: Path | None
     avatar_episode: bool
+    avatar_provider: str
     avatar_source_url: str | None
+    avatar_source_image: Path | None
     avatar_max_characters: int
 
 
@@ -191,8 +193,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--visual-render", action="store_true", help="Render scene images instead of the color fallback")
     parser.add_argument("--render-only", action="store_true", help="Render from an existing audio file without calling Fish Audio")
     parser.add_argument("--audio-file", type=Path, help="Existing audio file used with --render-only")
-    parser.add_argument("--avatar-episode", action="store_true", help="Generate a full episode from D-ID talking-avatar segments")
-    parser.add_argument("--avatar-source-url", default=os.getenv("D_ID_SOURCE_URL", ""), help="HTTPS image URL used by the Avatar provider")
+    parser.add_argument("--avatar-episode", action="store_true", help="Generate a full episode from provider-backed talking-avatar segments")
+    parser.add_argument("--avatar-provider", default=os.getenv("AVATAR_PROVIDER", "d_id"), choices=("d_id", "sadtalker"), help="Avatar backend: d_id or sadtalker")
+    parser.add_argument("--avatar-source-url", default=os.getenv("D_ID_SOURCE_URL", ""), help="HTTPS image URL used by the D-ID provider")
+    parser.add_argument("--avatar-source-image", type=Path, default=Path(os.getenv("AVATAR_SOURCE_IMAGE")) if os.getenv("AVATAR_SOURCE_IMAGE") else None, help="Local Nour portrait used by SadTalker")
     parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "900")), help="Maximum narration characters per Avatar segment")
     return parser
 
@@ -230,8 +234,11 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         raise ValueError("avatar max characters must be between 120 and 5000")
     if args.avatar_episode and not character_file:
         raise ValueError("--avatar-episode requires --character-file")
-    if args.avatar_episode and not args.avatar_source_url.strip():
-        raise ValueError("--avatar-episode requires --avatar-source-url or D_ID_SOURCE_URL")
+    avatar_provider = args.avatar_provider.strip().lower().replace("-", "_")
+    if args.avatar_episode and avatar_provider == "d_id" and not args.avatar_source_url.strip():
+        raise ValueError("D-ID avatar episodes require --avatar-source-url or D_ID_SOURCE_URL")
+    if args.avatar_episode and avatar_provider == "sadtalker" and not args.avatar_source_image:
+        raise ValueError("SadTalker avatar episodes require --avatar-source-image or AVATAR_SOURCE_IMAGE")
     return Settings(
         script=load_script(args.script_file),
         voice=args.voice.strip(),
@@ -256,7 +263,9 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         render_only=args.render_only,
         audio_file=args.audio_file,
         avatar_episode=args.avatar_episode,
+        avatar_provider=avatar_provider,
         avatar_source_url=args.avatar_source_url.strip() or None,
+        avatar_source_image=args.avatar_source_image,
         avatar_max_characters=args.avatar_max_characters,
     )
 
@@ -384,7 +393,9 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                 render_only=settings.render_only,
                 audio_file=settings.audio_file,
                 avatar_episode=settings.avatar_episode,
+                avatar_provider=settings.avatar_provider,
                 avatar_source_url=settings.avatar_source_url,
+                avatar_source_image=settings.avatar_source_image,
                 avatar_max_characters=settings.avatar_max_characters,
             )
             for attempt in range(1, settings.retries + 1):
@@ -479,7 +490,9 @@ def _avatar_segment_settings(settings: Settings, text: str) -> Settings:
         render_only=False,
         audio_file=None,
         avatar_episode=False,
+        avatar_provider=settings.avatar_provider,
         avatar_source_url=settings.avatar_source_url,
+        avatar_source_image=settings.avatar_source_image,
         avatar_max_characters=settings.avatar_max_characters,
     )
 
@@ -495,7 +508,11 @@ async def run_avatar_episode(settings: Settings, video_path: Path) -> Path:
         episode_id=settings.episode_name,
         character_id="podcast_host_nour_v1",
     )
-    provider = DIDAvatarProvider(source_url=settings.avatar_source_url)
+    provider = build_avatar_provider(
+        settings.avatar_provider,
+        source_url=settings.avatar_source_url,
+        source_image=settings.avatar_source_image,
+    )
     segment_videos: list[Path] = []
     captions: list[CaptionCue] = []
     performance_records: list[dict[str, object]] = []
@@ -571,7 +588,7 @@ def write_production_record(settings: Settings, video_path: Path) -> Path:
         "video_path": str(video_path),
         "script_characters": len(settings.script),
         "voice_provider": "fish_audio",
-        "avatar_provider": "d_id" if settings.avatar_episode else None,
+        "avatar_provider": settings.avatar_provider if settings.avatar_episode else None,
         "avatar_episode": settings.avatar_episode,
         "model": settings.model,
     }
@@ -585,7 +602,7 @@ async def run(settings: Settings) -> Path:
     if settings.dry_run:
         if settings.avatar_episode:
             planned = split_script_into_performance_segments(settings.script, settings.avatar_max_characters)
-            LOGGER.info("Avatar dry run: %s segment(s) planned; no Fish Audio or D-ID request sent", len(planned))
+            LOGGER.info("Avatar dry run: %s segment(s) planned for provider %s; no external request sent", len(planned), settings.avatar_provider)
         else:
             LOGGER.info("Dry run complete; no audio or video generated")
         return video_path
