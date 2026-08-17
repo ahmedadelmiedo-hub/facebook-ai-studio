@@ -93,9 +93,11 @@ jobs:
             --arg accelerator "$INPUT_ACCELERATOR" \
             '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator}' \
             > .kaggle-kernel/job_config.json
+          KERNEL_SLUG="${KERNEL_ID#*/}"
           jq -n \
             --arg id "$KERNEL_ID" \
-            '{id:$id, title:"SadTalker Rowat Alwaqe GPU", code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, dataset_sources:[], competition_sources:[], kernel_sources:[]}' \
+            --arg title "$KERNEL_SLUG" \
+            '{id:$id, title:$title, code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, dataset_sources:[], competition_sources:[], kernel_sources:[]}' \
             > .kaggle-kernel/kernel-metadata.json
           jq empty .kaggle-kernel/job_config.json
           jq empty .kaggle-kernel/kernel-metadata.json
