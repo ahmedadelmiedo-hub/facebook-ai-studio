@@ -126,6 +126,12 @@ jobs:
               dataset_ready=true
               break
             fi
+            if printf '%s' "$normalized_status" | grep -Eqi '403|forbidden'; then
+              echo "Kaggle status endpoint is forbidden for this token; waiting 90s for dataset processing before kernel push."
+              sleep 90
+              dataset_ready=true
+              break
+            fi
             if printf '%s' "$normalized_status" | grep -Eqi 'error|failed|invalid|not found|unauthorized'; then
               echo "Kaggle audio dataset did not become available: ${dataset_status}"
               exit 1
