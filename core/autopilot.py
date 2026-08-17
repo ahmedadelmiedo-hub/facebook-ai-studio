@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -75,11 +76,14 @@ class Settings:
     captions_file: Path | None
     visual_render: bool
     render_only: bool
+    audio_only: bool
     audio_file: Path | None
     avatar_episode: bool
+    avatar_audio_only: bool
     avatar_provider: str
     avatar_source_url: str | None
     avatar_source_image: Path | None
+    avatar_audio_dir: Path | None
     avatar_max_characters: int
 
 
@@ -201,11 +205,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--captions-file", type=Path, help="ASS captions file to burn into the rendered video")
     parser.add_argument("--visual-render", action="store_true", help="Render scene images instead of the color fallback")
     parser.add_argument("--render-only", action="store_true", help="Render from an existing audio file without calling Fish Audio")
+    parser.add_argument("--audio-only", action="store_true", help="Generate the Fish Audio MP3 only, without rendering video")
     parser.add_argument("--audio-file", type=Path, help="Existing audio file used with --render-only")
     parser.add_argument("--avatar-episode", action="store_true", help="Generate a full episode from provider-backed talking-avatar segments")
+    parser.add_argument("--avatar-audio-only", action="store_true", help="Generate only per-segment Fish Audio MP3 files for a later Avatar render")
     parser.add_argument("--avatar-provider", default=os.getenv("AVATAR_PROVIDER", "d_id"), choices=("d_id", "sadtalker"), help="Avatar backend: d_id or sadtalker")
     parser.add_argument("--avatar-source-url", default=os.getenv("D_ID_SOURCE_URL", ""), help="HTTPS image URL used by the D-ID provider")
     parser.add_argument("--avatar-source-image", type=Path, default=Path(os.getenv("AVATAR_SOURCE_IMAGE")) if os.getenv("AVATAR_SOURCE_IMAGE") else None, help="Local Nour portrait used by SadTalker")
+    parser.add_argument("--avatar-audio-dir", type=Path, default=Path(os.getenv("AVATAR_AUDIO_DIR")) if os.getenv("AVATAR_AUDIO_DIR") else None, help="Precomputed Fish Audio MP3 segments for Avatar rendering")
     parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "900")), help="Maximum narration characters per Avatar segment")
     return parser
 
@@ -270,11 +277,14 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         captions_file=args.captions_file,
         visual_render=args.visual_render,
         render_only=args.render_only,
+        audio_only=args.audio_only,
         audio_file=args.audio_file,
         avatar_episode=args.avatar_episode,
+        avatar_audio_only=args.avatar_audio_only,
         avatar_provider=avatar_provider,
         avatar_source_url=args.avatar_source_url.strip() or None,
         avatar_source_image=args.avatar_source_image,
+        avatar_audio_dir=args.avatar_audio_dir,
         avatar_max_characters=args.avatar_max_characters,
     )
 
@@ -393,6 +403,7 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                 retries=settings.retries,
                 tts_max_characters=settings.tts_max_characters,
                 dry_run=settings.dry_run,
+                audio_only=False,
                 character_file=settings.character_file,
                 scene_prompt=settings.scene_prompt,
                 scene_camera=settings.scene_camera,
@@ -402,9 +413,11 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                 render_only=settings.render_only,
                 audio_file=settings.audio_file,
                 avatar_episode=settings.avatar_episode,
+                avatar_audio_only=False,
                 avatar_provider=settings.avatar_provider,
                 avatar_source_url=settings.avatar_source_url,
                 avatar_source_image=settings.avatar_source_image,
+                avatar_audio_dir=settings.avatar_audio_dir,
                 avatar_max_characters=settings.avatar_max_characters,
             )
             for attempt in range(1, settings.retries + 1):
@@ -497,11 +510,14 @@ def _avatar_segment_settings(settings: Settings, text: str) -> Settings:
         captions_file=None,
         visual_render=False,
         render_only=False,
+        audio_only=False,
         audio_file=None,
         avatar_episode=False,
+        avatar_audio_only=False,
         avatar_provider=settings.avatar_provider,
         avatar_source_url=settings.avatar_source_url,
         avatar_source_image=settings.avatar_source_image,
+        avatar_audio_dir=settings.avatar_audio_dir,
         avatar_max_characters=settings.avatar_max_characters,
     )
 
@@ -534,7 +550,13 @@ async def run_avatar_episode(settings: Settings, video_path: Path) -> Path:
     for segment in segments:
         audio_path = avatar_dir / f"{segment.segment_id}.mp3"
         video_segment = avatar_dir / f"{segment.segment_id}.mp4"
-        await synthesize_audio(_avatar_segment_settings(settings, segment.text), audio_path)
+        precomputed_audio = settings.avatar_audio_dir / f"{segment.segment_id}.mp3" if settings.avatar_audio_dir else None
+        if settings.avatar_audio_dir:
+            if not precomputed_audio or not precomputed_audio.is_file():
+                raise FileNotFoundError(f"precomputed Avatar audio segment not found: {precomputed_audio}")
+            shutil.copy2(precomputed_audio, audio_path)
+        else:
+            await synthesize_audio(_avatar_segment_settings(settings, segment.text), audio_path)
         if not video_segment.is_file():
             await async_to_thread(
                 provider.create_talking_segment,
@@ -615,6 +637,28 @@ async def run(settings: Settings) -> Path:
         else:
             LOGGER.info("Dry run complete; no audio or video generated")
         return video_path
+    if settings.audio_only:
+        if settings.render_only or settings.avatar_episode or settings.avatar_audio_only:
+            raise ValueError("--audio-only cannot be combined with --render-only, --avatar-episode, or --avatar-audio-only")
+        await synthesize_audio(settings, audio_path)
+        LOGGER.info("Audio-only artifact generated: %s", audio_path)
+        return audio_path
+    if settings.avatar_audio_only:
+        if not settings.avatar_episode:
+            raise ValueError("--avatar-audio-only requires --avatar-episode")
+        segments = split_script_into_performance_segments(settings.script, settings.avatar_max_characters)
+        audio_dir = settings.avatar_audio_dir or settings.output_dir / f".{settings.episode_name}_avatar_audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        write_performance_plan(
+            segments,
+            audio_dir / "performance_plan.json",
+            episode_id=settings.episode_name,
+            character_id="podcast_host_nour_v1",
+        )
+        for segment in segments:
+            await synthesize_audio(_avatar_segment_settings(settings, segment.text), audio_dir / f"{segment.segment_id}.mp3")
+        LOGGER.info("Avatar audio-only artifacts generated: %s", audio_dir)
+        return audio_dir
     if settings.avatar_episode:
         if settings.render_only:
             raise ValueError("--avatar-episode cannot be combined with --render-only")

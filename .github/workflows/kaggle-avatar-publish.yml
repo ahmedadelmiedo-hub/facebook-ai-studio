@@ -73,6 +73,34 @@ jobs:
           test -n "$YOUTUBE_CLIENT_ID"
           test -n "$YOUTUBE_CLIENT_SECRET"
           test -n "$YOUTUBE_REFRESH_TOKEN"
+      - name: Generate Avatar audio segments on GitHub
+        env:
+          FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
+          FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
+          INPUT_SCRIPT: ${{ inputs.script_file }}
+          INPUT_EPISODE: ${{ inputs.episode_name }}
+          INPUT_MAX_CHARACTERS: ${{ inputs.avatar_max_characters }}
+        run: |
+          test -n "$FISH_API_KEY"
+          test -n "$FISH_VOICE_ID"
+          rm -rf storage/autopilot/github-avatar-audio
+          mkdir -p storage/autopilot/github-avatar-audio
+          PYTHONPATH=. python -m core.autopilot \
+            --avatar-episode \
+            --avatar-audio-only \
+            --avatar-provider sadtalker \
+            --avatar-source-image storage/references/nour-master-v1.png \
+            --avatar-audio-dir storage/autopilot/github-avatar-audio \
+            --script-file "$INPUT_SCRIPT" \
+            --voice "$FISH_VOICE_ID" \
+            --format long \
+            --episode-name "$INPUT_EPISODE" \
+            --output-dir storage/autopilot/github-avatar-audio \
+            --character-file content/characters/nour-podcast-host-v1.json \
+            --avatar-max-characters "$INPUT_MAX_CHARACTERS" \
+            --review-status approved \
+            --keep-audio
+          test "$(find storage/autopilot/github-avatar-audio -maxdepth 1 -name '*.mp3' | wc -l)" -gt 0
       - name: Prepare Kaggle kernel package
         env:
           INPUT_SCRIPT: ${{ inputs.script_file }}
@@ -84,6 +112,7 @@ jobs:
           rm -rf .kaggle-kernel kaggle-output
           mkdir -p .kaggle-kernel kaggle-output
           cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
+          cp -R storage/autopilot/github-avatar-audio .kaggle-kernel/audio_segments
           jq -n \
             --arg script "$INPUT_SCRIPT" \
             --arg episode "$INPUT_EPISODE" \
@@ -91,7 +120,8 @@ jobs:
             --argjson max_characters "$INPUT_MAX_CHARACTERS" \
             --argjson run_short "$INPUT_RUN_SHORT" \
             --arg accelerator "$INPUT_ACCELERATOR" \
-            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator}' \
+            --arg audio_dir "audio_segments" \
+            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator, audio_dir:$audio_dir, voice_id:"precomputed"}' \
             > .kaggle-kernel/job_config.json
           KERNEL_SLUG="${KERNEL_ID#*/}"
           jq -n \
@@ -164,4 +194,5 @@ jobs:
           name: kaggle-avatar-${{ inputs.episode_name }}
           path: |
             storage/autopilot/kaggle-import/
+            storage/autopilot/github-avatar-audio/
             kaggle-output/
