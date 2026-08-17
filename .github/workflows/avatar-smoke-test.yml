@@ -38,7 +38,7 @@ jobs:
             --output storage/autopilot/avatar-smoke/visual-preview.wav
       - name: Generate talking-avatar segment
         run: |
-          python tools/run_avatar_segment.py \
+          PYTHONPATH=. python tools/run_avatar_segment.py \
             --audio storage/autopilot/avatar-smoke/visual-preview.wav \
             --source-url "$D_ID_SOURCE_URL" \
             --output storage/autopilot/avatar-smoke/nour-avatar.mp4
