@@ -18,6 +18,11 @@ on:
         required: true
         default: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663829408040/fnhSKHjBzLDTeCTu.png"
         type: string
+      avatar_max_characters:
+        description: "Maximum narration characters per Avatar segment"
+        required: true
+        default: "3200"
+        type: string
 
 permissions:
   contents: read
@@ -25,7 +30,7 @@ permissions:
 jobs:
   avatar-episode:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
     env:
       FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
       FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
@@ -55,13 +60,14 @@ jobs:
             --avatar-episode \
             --script-file "${{ inputs.script_file }}" \
             --voice "$FISH_VOICE_ID" \
-            --format short \
+            --format long \
             --episode-name "${{ inputs.episode_name }}" \
             --output-dir storage/autopilot/avatar-episode \
             --character-file content/characters/nour-podcast-host-v1.json \
-            --scene-prompt "Nour narrates a mysterious case in her podcast studio" \
-            --scene-camera "close medium shot, podcast microphone visible" \
+            --scene-prompt "Nour narrates the full case from her podcast studio" \
+            --scene-camera "cinematic medium shot with microphone and evidence board" \
             --avatar-source-url "$D_ID_SOURCE_URL" \
+            --avatar-max-characters "${{ inputs.avatar_max_characters }}" \
             --review-status approved \
             --keep-audio
       - name: Upload episode artifacts

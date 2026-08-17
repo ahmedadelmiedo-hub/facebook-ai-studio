@@ -193,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audio-file", type=Path, help="Existing audio file used with --render-only")
     parser.add_argument("--avatar-episode", action="store_true", help="Generate a full episode from D-ID talking-avatar segments")
     parser.add_argument("--avatar-source-url", default=os.getenv("D_ID_SOURCE_URL", ""), help="HTTPS image URL used by the Avatar provider")
-    parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "420")), help="Maximum narration characters per Avatar segment")
+    parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "900")), help="Maximum narration characters per Avatar segment")
     return parser
 
 
@@ -226,8 +226,8 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         raise ValueError("--audio-file is required with --render-only")
     if args.render_only and not args.visual_render:
         raise ValueError("--render-only requires --visual-render")
-    if not 120 <= args.avatar_max_characters <= 1200:
-        raise ValueError("avatar max characters must be between 120 and 1200")
+    if not 120 <= args.avatar_max_characters <= 5000:
+        raise ValueError("avatar max characters must be between 120 and 5000")
     if args.avatar_episode and not character_file:
         raise ValueError("--avatar-episode requires --character-file")
     if args.avatar_episode and not args.avatar_source_url.strip():
