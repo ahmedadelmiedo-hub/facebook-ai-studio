@@ -33,6 +33,14 @@ on:
         required: true
         default: "ملف الرصد 17 | الحلقة 02 | رواة الواقع"
         type: string
+      accelerator:
+        description: "Kaggle free GPU accelerator"
+        required: true
+        default: "NvidiaTeslaP100"
+        type: choice
+        options:
+          - NvidiaTeslaP100
+          - NvidiaTeslaT4
 
 permissions:
   contents: read
@@ -71,6 +79,7 @@ jobs:
           INPUT_EPISODE: ${{ inputs.episode_name }}
           INPUT_MAX_CHARACTERS: ${{ inputs.avatar_max_characters }}
           INPUT_RUN_SHORT: ${{ inputs.run_short }}
+          INPUT_ACCELERATOR: ${{ inputs.accelerator }}
         run: |
           rm -rf .kaggle-kernel kaggle-output
           mkdir -p .kaggle-kernel kaggle-output
@@ -81,7 +90,8 @@ jobs:
             --arg output "storage/autopilot/avatar-sadtalker-kaggle-full" \
             --argjson max_characters "$INPUT_MAX_CHARACTERS" \
             --argjson run_short "$INPUT_RUN_SHORT" \
-            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short}' \
+            --arg accelerator "$INPUT_ACCELERATOR" \
+            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator}' \
             > .kaggle-kernel/job_config.json
           jq -n \
             --arg id "$KERNEL_ID" \
@@ -89,9 +99,9 @@ jobs:
             > .kaggle-kernel/kernel-metadata.json
           jq empty .kaggle-kernel/job_config.json
           jq empty .kaggle-kernel/kernel-metadata.json
-      - name: Push and run Kaggle notebook on Tesla T4
+      - name: Push and run Kaggle notebook on Kaggle GPU
         run: |
-          kaggle kernels push -p .kaggle-kernel --accelerator NvidiaTeslaT4 --timeout 10800
+          kaggle kernels push -p .kaggle-kernel --accelerator "${{ inputs.accelerator }}" --timeout 10800
       - name: Wait for Kaggle kernel completion
         run: |
           for attempt in $(seq 1 180); do
