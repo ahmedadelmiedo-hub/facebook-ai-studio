@@ -138,7 +138,19 @@ jobs:
           jq empty .kaggle-kernel/kernel-metadata.json
       - name: Push and run Kaggle notebook on Kaggle GPU
         run: |
-          kaggle kernels push -p .kaggle-kernel --accelerator "${{ inputs.accelerator }}" --timeout 10800
+          pushed=false
+          for attempt in 1 2 3 4 5; do
+            if kaggle kernels push -p .kaggle-kernel --accelerator "${{ inputs.accelerator }}" --timeout 10800; then
+              pushed=true
+              break
+            fi
+            echo "Kaggle Push attempt ${attempt}/5 failed; retrying after backoff."
+            sleep $((attempt * 20))
+          done
+          if [ "$pushed" != "true" ]; then
+            echo "Kaggle Push failed after 5 attempts."
+            exit 1
+          fi
       - name: Wait for Kaggle kernel completion
         run: |
           max_attempts=60
