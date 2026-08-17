@@ -97,7 +97,8 @@ jobs:
           jq -n \
             --arg id "$KERNEL_ID" \
             --arg title "$KERNEL_SLUG" \
-            '{id:$id, title:$title, code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, dataset_sources:[], competition_sources:[], kernel_sources:[]}' \
+            --arg machine_shape "$INPUT_ACCELERATOR" \
+            '{id:$id, title:$title, code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, machine_shape:$machine_shape, dataset_sources:[], competition_sources:[], kernel_sources:[]}' \
             > .kaggle-kernel/kernel-metadata.json
           jq empty .kaggle-kernel/job_config.json
           jq empty .kaggle-kernel/kernel-metadata.json
