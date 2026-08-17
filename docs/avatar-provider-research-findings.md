@@ -32,3 +32,39 @@ Source: https://github.com/OpenTalker/SadTalker
 ## Updated recommendation
 
 SadTalker is the most direct open-source replacement for D-ID for this repository: `image + segment audio -> talking-head MP4`. MuseTalk is a strong lip-sync backend when a base video exists and can be useful later for higher-quality mouth synchronization. Wav2Lip remains a personal/non-commercial fallback because the official open-source README prohibits commercial use of its released model.
+
+## GitHub Actions GPU availability
+
+Official GitHub sources:
+- https://github.blog/changelog/2024-07-08-github-actions-gpu-hosted-runners-are-now-generally-available/
+- https://docs.github.com/en/actions/reference/runners/larger-runners
+
+- GitHub documents GPU larger runners with a Tesla T4, 4 vCPU, 28 GB RAM, 16 GB VRAM, and 176 GB SSD on Ubuntu/Windows.
+- GPU larger runners must be configured through organization or enterprise runner groups and selected by the runner label in `runs-on`; they are not the same as the default `ubuntu-latest` runner.
+- GitHub's documentation notes that larger runners require valid billing information and a positive Actions spending limit.
+- The current repository owner `ahmedadelmiedo-hub` is a personal GitHub user account, the repository is public, and the repository currently has zero self-hosted runners.
+
+## Practical implication
+
+The current `ubuntu-latest` workflow cannot be assumed to have a GPU. The workable GitHub-only route is either to configure an eligible GitHub GPU larger runner and target its generated label, or to use an external GPU runner registered as self-hosted. A CPU-only SadTalker workflow can be used only as a diagnostic experiment; it is not a reliable production path for a long episode.
+
+## Free GPU options
+
+Official Google Colab FAQ: https://research.google.com/colaboratory/faq.html
+- Colab offers free access to compute resources including GPUs, but resources are not guaranteed or unlimited and usage limits fluctuate.
+- Colab virtual machines are deleted after idle periods and have a maximum lifetime.
+- The free managed runtime restricts abuse and explicitly lists deepfakes among disallowed activities. This is a major policy risk for a talking-avatar workflow, so Colab should not be treated as an unqualified production route for Nour.
+
+Official Kaggle GPU documentation: https://www.kaggle.com/docs/efficient-gpu-usage
+- Kaggle documents free NVIDIA Tesla P100 access for notebooks, with a weekly GPU quota of 30 hours or sometimes higher depending on demand and resources.
+- Kaggle advises monitoring GPU usage, stopping idle sessions, and avoiding inefficient batch sessions.
+- Kaggle is a more technically suitable free-GPU test environment for SadTalker than Colab, but availability and quota are still not guaranteed; it is best for manual short/episode tests rather than unattended GitHub Actions execution.
+
+## Updated practical recommendation
+
+For a free GPU, use Kaggle for a manual SadTalker notebook test and keep GitHub Actions for source control, artifact storage, and later publishing. Do not route the talking-avatar generation through a free Colab managed runtime without checking current policy because the official FAQ lists deepfakes as disallowed. GitHub's standard public-repository runner remains CPU-only; GitHub GPU larger runners require separate runner configuration and billing eligibility.
+
+Official Kaggle Acceptable Use Policy: https://www.kaggle.com/aup
+- Kaggle prohibits resource abuse and activities unrelated to ML/data science, but the policy page reviewed does not include the same explicit blanket ban on deepfake generation that appears in the Colab FAQ.
+- Any use must still comply with Kaggle's legal, intellectual-property, privacy, and deceptive-content rules. The Nour asset is a fictional cartoon character, which reduces identity/privacy risk, but the channel should disclose synthetic/AI-generated production where appropriate.
+- Kaggle remains a manual notebook route, not a native GitHub Actions runner. A GitHub-to-Kaggle unattended bridge would require Kaggle credentials and must respect Kaggle's session/quota policies.
