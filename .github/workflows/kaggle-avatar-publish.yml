@@ -104,18 +104,35 @@ jobs:
           kaggle kernels push -p .kaggle-kernel --accelerator "${{ inputs.accelerator }}" --timeout 10800
       - name: Wait for Kaggle kernel completion
         run: |
-          for attempt in $(seq 1 180); do
+          max_attempts=60
+          completed=false
+          mkdir -p kaggle-output/status
+          for attempt in $(seq 1 "$max_attempts"); do
             status_output="$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)"
-            echo "Kaggle status check $attempt/180"
-            echo "$status_output" | tail -20
-            if echo "$status_output" | grep -Eqi 'complete|success|error|failed|cancel'; then
-              if echo "$status_output" | grep -Eqi 'error|failed|cancel'; then
-                exit 1
-              fi
+            normalized_status="$(printf '%s' "$status_output" | tr '[:upper:]' '[:lower:]')"
+            printf '%s\n' "$status_output" | tee "kaggle-output/status/check-${attempt}.txt"
+            {
+              echo "### Kaggle status check ${attempt}/${max_attempts}"
+              echo '```text'
+              printf '%s\n' "$status_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if printf '%s' "$normalized_status" | grep -Eqi 'error|failed|cancelled|canceled|dead|invalid|not found|unauthorized'; then
+              echo "Kaggle kernel returned a terminal failure state."
+              exit 1
+            fi
+            if printf '%s' "$normalized_status" | grep -Eqi 'complete|succeeded|success'; then
+              completed=true
               break
             fi
-            sleep 60
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep 60
+            fi
           done
+          if [ "$completed" != "true" ]; then
+            echo "Kaggle kernel did not reach a terminal success state within ${max_attempts} minutes. It may be queued or unavailable on the selected accelerator."
+            exit 1
+          fi
       - name: Download MP4 output from Kaggle
         run: |
           kaggle kernels output "$KERNEL_ID" --path kaggle-output --force --file-pattern '.*\.mp4$'
