@@ -1,0 +1,137 @@
+name: Kaggle GPU Avatar Episode and YouTube Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      kaggle_kernel_id:
+        description: "Kaggle kernel ID: your-kaggle-username/sadtalker-rowat-alwaqe"
+        required: true
+        default: "YOUR_KAGGLE_USERNAME/sadtalker-rowat-alwaqe"
+        type: string
+      script_file:
+        description: "Approved script path in the repository"
+        required: true
+        default: "content/scripts/long/case-001-EP02.txt"
+        type: string
+      episode_name:
+        description: "Output episode name"
+        required: true
+        default: "case-001-EP02-SADTALKER-KAGGLE-FULL"
+        type: string
+      avatar_max_characters:
+        description: "Maximum narration characters per Avatar segment"
+        required: true
+        default: "900"
+        type: string
+      run_short:
+        description: "Run the Short smoke test before the full episode"
+        required: true
+        default: false
+        type: boolean
+      title:
+        description: "YouTube title"
+        required: true
+        default: "ملف الرصد 17 | الحلقة 02 | رواة الواقع"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  kaggle-gpu-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      KERNEL_ID: ${{ inputs.kaggle_kernel_id }}
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      YOUTUBE_NOTIFY_SUBSCRIBERS: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Kaggle CLI
+        run: python -m pip install --upgrade kaggle
+      - name: Verify non-secret configuration
+        run: |
+          test -n "$KAGGLE_API_TOKEN"
+          test -n "$KERNEL_ID"
+          test "$KERNEL_ID" != "YOUR_KAGGLE_USERNAME/sadtalker-rowat-alwaqe"
+          test -n "$YOUTUBE_CLIENT_ID"
+          test -n "$YOUTUBE_CLIENT_SECRET"
+          test -n "$YOUTUBE_REFRESH_TOKEN"
+      - name: Prepare Kaggle kernel package
+        env:
+          INPUT_SCRIPT: ${{ inputs.script_file }}
+          INPUT_EPISODE: ${{ inputs.episode_name }}
+          INPUT_MAX_CHARACTERS: ${{ inputs.avatar_max_characters }}
+          INPUT_RUN_SHORT: ${{ inputs.run_short }}
+        run: |
+          rm -rf .kaggle-kernel kaggle-output
+          mkdir -p .kaggle-kernel kaggle-output
+          cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
+          jq -n \
+            --arg script "$INPUT_SCRIPT" \
+            --arg episode "$INPUT_EPISODE" \
+            --arg output "storage/autopilot/avatar-sadtalker-kaggle-full" \
+            --argjson max_characters "$INPUT_MAX_CHARACTERS" \
+            --argjson run_short "$INPUT_RUN_SHORT" \
+            '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short}' \
+            > .kaggle-kernel/job_config.json
+          jq -n \
+            --arg id "$KERNEL_ID" \
+            '{id:$id, title:"SadTalker Rowat Alwaqe GPU", code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, dataset_sources:[], competition_sources:[], kernel_sources:[]}' \
+            > .kaggle-kernel/kernel-metadata.json
+          jq empty .kaggle-kernel/job_config.json
+          jq empty .kaggle-kernel/kernel-metadata.json
+      - name: Push and run Kaggle notebook on Tesla T4
+        run: |
+          kaggle kernels push -p .kaggle-kernel --accelerator NvidiaTeslaT4 --timeout 10800
+      - name: Wait for Kaggle kernel completion
+        run: |
+          for attempt in $(seq 1 180); do
+            status_output="$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)"
+            echo "Kaggle status check $attempt/180"
+            echo "$status_output" | tail -20
+            if echo "$status_output" | grep -Eqi 'complete|success|error|failed|cancel'; then
+              if echo "$status_output" | grep -Eqi 'error|failed|cancel'; then
+                exit 1
+              fi
+              break
+            fi
+            sleep 60
+          done
+      - name: Download MP4 output from Kaggle
+        run: |
+          kaggle kernels output "$KERNEL_ID" --path kaggle-output --force --file-pattern '.*\.mp4$'
+          VIDEO_PATH="$(find kaggle-output -type f -name '*.mp4' -print -quit)"
+          test -n "$VIDEO_PATH"
+          mkdir -p storage/autopilot/kaggle-import
+          cp "$VIDEO_PATH" "storage/autopilot/kaggle-import/${{ inputs.episode_name }}.mp4"
+          echo "VIDEO_PATH=storage/autopilot/kaggle-import/${{ inputs.episode_name }}.mp4" >> "$GITHUB_ENV"
+      - name: Quality gate for episode MP4
+        run: |
+          test -s "$VIDEO_PATH"
+          ffmpeg -v error -i "$VIDEO_PATH" -f null -
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height -of default=noprint_wrappers=1 "$VIDEO_PATH"
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$VIDEO_PATH"
+      - name: Install YouTube uploader dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Upload episode to YouTube as Public
+        run: |
+          PYTHONPATH=. python tools/upload_episode_public.py \
+            --video "$VIDEO_PATH" \
+            --asset-id "${{ inputs.episode_name }}" \
+            --title "${{ inputs.title }}"
+      - name: Upload production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaggle-avatar-${{ inputs.episode_name }}
+          path: |
+            storage/autopilot/kaggle-import/
+            kaggle-output/

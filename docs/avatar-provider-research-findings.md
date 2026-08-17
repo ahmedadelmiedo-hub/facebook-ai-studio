@@ -68,3 +68,25 @@ Official Kaggle Acceptable Use Policy: https://www.kaggle.com/aup
 - Kaggle prohibits resource abuse and activities unrelated to ML/data science, but the policy page reviewed does not include the same explicit blanket ban on deepfake generation that appears in the Colab FAQ.
 - Any use must still comply with Kaggle's legal, intellectual-property, privacy, and deceptive-content rules. The Nour asset is a fictional cartoon character, which reduces identity/privacy risk, but the channel should disclose synthetic/AI-generated production where appropriate.
 - Kaggle remains a manual notebook route, not a native GitHub Actions runner. A GitHub-to-Kaggle unattended bridge would require Kaggle credentials and must respect Kaggle's session/quota policies.
+
+## Kaggle API automation
+
+Official sources:
+- https://www.kaggle.com/docs/api
+- https://github.com/Kaggle/kaggle-cli/blob/main/docs/README.md
+
+- Kaggle provides an official CLI for use from shell scripts and CI. The current CLI documentation supports authentication through `KAGGLE_API_TOKEN`, an API token file, legacy `kaggle.json`, or OAuth for interactive use.
+- The CLI includes kernel/notebook operations and can be installed in a GitHub Actions job with Python 3.11+.
+- Kaggle applies dynamic rate limits, so an automated workflow must avoid tight polling loops and should retry with delays after HTTP 429 responses.
+- The API token should be stored as a GitHub Actions secret and written to a temporary credentials file at runtime; it must never be committed.
+- The official CLI kernel commands use `kaggle kernels push -p <folder> --accelerator NvidiaTeslaT4 --timeout <seconds>` to upload and run a notebook, and `kaggle kernels output <owner/kernel-slug> -p <folder> -o` to retrieve generated files.
+- The CLI documentation warns that the default Kaggle P100 image may not support current PyTorch CUDA kernels; it recommends `NvidiaTeslaT4` or a Pascal-compatible PyTorch build. Therefore the automation should request `NvidiaTeslaT4` when available and fail clearly if the account cannot access it.
+
+## YouTube upload requirements
+
+Official source: https://developers.google.com/youtube/v3/docs/videos/insert
+
+- YouTube's `videos.insert` accepts `status.privacyStatus`, including `public`, and requires OAuth with the `youtube.upload` scope or an equivalent YouTube scope.
+- The resource supports `status.containsSyntheticMedia`, which should be set appropriately for an AI-generated host/video.
+- YouTube warns that uploads from unverified API projects created after July 28, 2020 can be restricted to private viewing until the API project completes the required audit. This means a successful API upload is not alone a guarantee that the video will be publicly visible.
+- The existing repository already has YouTube OAuth secrets and a publisher path; the Kaggle bridge should return the MP4 to GitHub and then invoke that publisher only after an explicit quality gate.

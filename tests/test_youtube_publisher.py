@@ -58,6 +58,7 @@ class YouTubePublisherTests(unittest.TestCase):
                     result = self.publisher.upload_video(self.asset, video, "playlist123")
             metadata = upload.call_args.args[1]
             self.assertEqual(metadata["status"]["privacyStatus"], "private")
+            self.assertEqual(metadata["status"]["containsSyntheticMedia"], True)
             self.assertIn("publishAt", metadata["status"])
             self.assertEqual(result.video_id, "video123")
             self.assertEqual(result.playlist_id, "playlist123")

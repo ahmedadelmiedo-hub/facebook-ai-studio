@@ -192,6 +192,7 @@ class YouTubePublisher:
                 "selfDeclaredMadeForKids": False,
                 "embeddable": True,
                 "publicStatsViewable": True,
+                "containsSyntheticMedia": True,
             },
         }
         if publish_at:
