@@ -138,6 +138,39 @@ def mux_audio_and_captions(
     _run(command)
 
 
+def render_avatar_episode(
+    *,
+    segment_paths: list[Path],
+    captions_path: Path | None,
+    output_path: Path,
+    fonts_dir: Path | None = None,
+) -> Path:
+    """Concatenate D-ID avatar segments and burn one caption track over them."""
+    if not segment_paths:
+        raise RenderError("avatar episode has no segments")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="avatar-episode-") as temp_dir:
+        temp_root = Path(temp_dir)
+        joined = temp_root / "joined.mp4"
+        _concat_segments(segment_paths, joined)
+        if captions_path is None:
+            output_path.write_bytes(joined.read_bytes())
+        else:
+            subtitle_filter = f"subtitles=filename='{captions_path.as_posix()}'"
+            if fonts_dir:
+                subtitle_filter += f":fontsdir='{fonts_dir.as_posix()}'"
+            _run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(joined), "-vf", subtitle_filter,
+                "-map", "0:v:0", "-map", "0:a:0?",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+                "-pix_fmt", "yuv420p", "-c:a", "copy", str(output_path),
+            ])
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise RenderError("avatar episode renderer returned an empty file")
+    return output_path
+
+
 def render_visual_video(
     *,
     scene_plan: Path,

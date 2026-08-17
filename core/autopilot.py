@@ -14,9 +14,11 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from core.captions import build_estimated_cues, write_arabic_ass
+from core.avatar_animation import DIDAvatarProvider
+from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.character_consistency import build_scene_manifest, load_character_bible
-from core.scene_renderer import render_visual_video
+from core.performance_planner import split_script_into_performance_segments, write_performance_plan
+from core.scene_renderer import probe_duration, render_avatar_episode, render_visual_video
 
 LOGGER = logging.getLogger("facebook_ai_studio.autopilot")
 DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. جثة في شقة مهجورة في طنطا.
@@ -65,6 +67,9 @@ class Settings:
     visual_render: bool
     render_only: bool
     audio_file: Path | None
+    avatar_episode: bool
+    avatar_source_url: str | None
+    avatar_max_characters: int
 
 
 def parse_color(value: str) -> tuple[int, int, int]:
@@ -186,6 +191,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--visual-render", action="store_true", help="Render scene images instead of the color fallback")
     parser.add_argument("--render-only", action="store_true", help="Render from an existing audio file without calling Fish Audio")
     parser.add_argument("--audio-file", type=Path, help="Existing audio file used with --render-only")
+    parser.add_argument("--avatar-episode", action="store_true", help="Generate a full episode from D-ID talking-avatar segments")
+    parser.add_argument("--avatar-source-url", default=os.getenv("D_ID_SOURCE_URL", ""), help="HTTPS image URL used by the Avatar provider")
+    parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "420")), help="Maximum narration characters per Avatar segment")
     return parser
 
 
@@ -218,6 +226,12 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         raise ValueError("--audio-file is required with --render-only")
     if args.render_only and not args.visual_render:
         raise ValueError("--render-only requires --visual-render")
+    if not 120 <= args.avatar_max_characters <= 1200:
+        raise ValueError("avatar max characters must be between 120 and 1200")
+    if args.avatar_episode and not character_file:
+        raise ValueError("--avatar-episode requires --character-file")
+    if args.avatar_episode and not args.avatar_source_url.strip():
+        raise ValueError("--avatar-episode requires --avatar-source-url or D_ID_SOURCE_URL")
     return Settings(
         script=load_script(args.script_file),
         voice=args.voice.strip(),
@@ -241,6 +255,9 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
         visual_render=args.visual_render,
         render_only=args.render_only,
         audio_file=args.audio_file,
+        avatar_episode=args.avatar_episode,
+        avatar_source_url=args.avatar_source_url.strip() or None,
+        avatar_max_characters=args.avatar_max_characters,
     )
 
 
@@ -366,6 +383,9 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                 visual_render=settings.visual_render,
                 render_only=settings.render_only,
                 audio_file=settings.audio_file,
+                avatar_episode=settings.avatar_episode,
+                avatar_source_url=settings.avatar_source_url,
+                avatar_max_characters=settings.avatar_max_characters,
             )
             for attempt in range(1, settings.retries + 1):
                 try:
@@ -434,6 +454,108 @@ def write_visual_scene_manifest(settings: Settings, video_path: Path) -> Path | 
     return manifest_path
 
 
+def _avatar_segment_settings(settings: Settings, text: str) -> Settings:
+    return Settings(
+        script=text,
+        voice=settings.voice,
+        model=settings.model,
+        output_dir=settings.output_dir,
+        episode_name=settings.episode_name,
+        title=settings.title,
+        profile=settings.profile,
+        review_status=settings.review_status,
+        background=settings.background,
+        fps=settings.fps,
+        keep_audio=True,
+        retries=settings.retries,
+        tts_max_characters=settings.tts_max_characters,
+        dry_run=False,
+        character_file=settings.character_file,
+        scene_prompt=settings.scene_prompt,
+        scene_camera=settings.scene_camera,
+        scene_plan_file=None,
+        captions_file=None,
+        visual_render=False,
+        render_only=False,
+        audio_file=None,
+        avatar_episode=False,
+        avatar_source_url=settings.avatar_source_url,
+        avatar_max_characters=settings.avatar_max_characters,
+    )
+
+
+async def run_avatar_episode(settings: Settings, video_path: Path) -> Path:
+    """Create per-sentence audio/avatar segments, then compose a captioned episode."""
+    segments = split_script_into_performance_segments(settings.script, settings.avatar_max_characters)
+    avatar_dir = settings.output_dir / f".{settings.episode_name}_avatar"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    write_performance_plan(
+        segments,
+        avatar_dir / "performance_plan.json",
+        episode_id=settings.episode_name,
+        character_id="podcast_host_nour_v1",
+    )
+    provider = DIDAvatarProvider(source_url=settings.avatar_source_url)
+    segment_videos: list[Path] = []
+    captions: list[CaptionCue] = []
+    performance_records: list[dict[str, object]] = []
+    offset = 0.0
+    expression_by_emotion = {
+        "serious": "serious",
+        "quiet_suspense": "serious",
+        "discovery": "surprise",
+    }
+    for segment in segments:
+        audio_path = avatar_dir / f"{segment.segment_id}.mp3"
+        video_segment = avatar_dir / f"{segment.segment_id}.mp4"
+        await synthesize_audio(_avatar_segment_settings(settings, segment.text), audio_path)
+        if not video_segment.is_file():
+            await asyncio.to_thread(
+                provider.create_talking_segment,
+                audio_path=audio_path,
+                output_path=video_segment,
+                expression_events=[
+                    {
+                        "start_frame": 0,
+                        "expression": expression_by_emotion.get(segment.emotion, "neutral"),
+                        "intensity": 0.6,
+                    }
+                ],
+                name=f"{settings.episode_name}-{segment.segment_id}",
+            )
+        duration = probe_duration(audio_path)
+        for cue in build_estimated_cues(segment.text, duration):
+            captions.append(CaptionCue(start=cue.start + offset, end=cue.end + offset, text=cue.text))
+        performance_records.append(
+            {
+                **segment.to_dict(),
+                "audio": str(audio_path),
+                "video": str(video_segment),
+                "duration": duration,
+                "start": offset,
+                "end": offset + duration,
+            }
+        )
+        offset += duration
+        segment_videos.append(video_segment)
+    (avatar_dir / "performance_runtime.json").write_text(
+        json.dumps({"segments": performance_records, "duration": offset}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    captions_path = video_path.with_suffix(".ass")
+    write_arabic_ass(captions, captions_path, vertical=settings.profile.name == "short")
+    render_avatar_episode(
+        segment_paths=segment_videos,
+        captions_path=captions_path,
+        output_path=video_path,
+        fonts_dir=Path("/usr/share/fonts/truetype/noto"),
+    )
+    if not settings.keep_audio:
+        for segment in segments:
+            (avatar_dir / f"{segment.segment_id}.mp3").unlink(missing_ok=True)
+    return video_path
+
+
 def write_production_record(settings: Settings, video_path: Path) -> Path:
     """Save non-secret metadata so a generated artifact remains reviewable."""
     record_path = video_path.with_suffix(".json")
@@ -449,6 +571,8 @@ def write_production_record(settings: Settings, video_path: Path) -> Path:
         "video_path": str(video_path),
         "script_characters": len(settings.script),
         "voice_provider": "fish_audio",
+        "avatar_provider": "d_id" if settings.avatar_episode else None,
+        "avatar_episode": settings.avatar_episode,
         "model": settings.model,
     }
     record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -459,8 +583,20 @@ async def run(settings: Settings) -> Path:
     audio_path, video_path = build_output_paths(settings.output_dir, settings.episode_name)
     LOGGER.info("%s [%s] -> %s", settings.episode_name, settings.profile.name, video_path)
     if settings.dry_run:
-        LOGGER.info("Dry run complete; no audio or video generated")
+        if settings.avatar_episode:
+            planned = split_script_into_performance_segments(settings.script, settings.avatar_max_characters)
+            LOGGER.info("Avatar dry run: %s segment(s) planned; no Fish Audio or D-ID request sent", len(planned))
+        else:
+            LOGGER.info("Dry run complete; no audio or video generated")
         return video_path
+    if settings.avatar_episode:
+        if settings.render_only:
+            raise ValueError("--avatar-episode cannot be combined with --render-only")
+        result = await run_avatar_episode(settings, video_path)
+        record_path = write_production_record(settings, result)
+        LOGGER.info("Avatar episode generated: %s", result)
+        LOGGER.info("Production record: %s", record_path)
+        return result
     if settings.render_only:
         audio_path = settings.audio_file.resolve()
         if not audio_path.is_file():
