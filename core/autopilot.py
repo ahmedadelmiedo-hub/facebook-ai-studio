@@ -11,7 +11,7 @@ import re
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from core.avatar_animation import build_avatar_provider
@@ -584,7 +584,7 @@ def write_production_record(settings: Settings, video_path: Path) -> Path:
         "title": settings.title,
         "render_profile": asdict(settings.profile),
         "review_status": settings.review_status,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "video_path": str(video_path),
         "script_characters": len(settings.script),
         "voice_provider": "fish_audio",
