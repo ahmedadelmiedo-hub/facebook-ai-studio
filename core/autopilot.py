@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 from core.avatar_animation import build_avatar_provider
@@ -28,6 +29,14 @@ DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. ج
 DEFAULT_OUTPUT_DIR = Path("storage/autopilot")
 DEFAULT_MODEL = "s2.1-pro-free"
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
+
+
+async def async_to_thread(func, /, *args, **kwargs):
+    """Run blocking work in a worker thread on Python 3.8+ runtimes."""
+    if hasattr(asyncio, "to_thread"):
+        return await asyncio.to_thread(func, *args, **kwargs)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, partial(func, *args, **kwargs))
 
 
 @dataclass(frozen=True)
@@ -400,7 +409,7 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
             )
             for attempt in range(1, settings.retries + 1):
                 try:
-                    await asyncio.to_thread(fish_audio_request, chunk_settings, chunk_path)
+                    await async_to_thread(fish_audio_request, chunk_settings, chunk_path)
                     break
                 except RuntimeError:
                     chunk_path.unlink(missing_ok=True)
@@ -527,7 +536,7 @@ async def run_avatar_episode(settings: Settings, video_path: Path) -> Path:
         video_segment = avatar_dir / f"{segment.segment_id}.mp4"
         await synthesize_audio(_avatar_segment_settings(settings, segment.text), audio_path)
         if not video_segment.is_file():
-            await asyncio.to_thread(
+            await async_to_thread(
                 provider.create_talking_segment,
                 audio_path=audio_path,
                 output_path=video_segment,
