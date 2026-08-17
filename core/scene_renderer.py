@@ -101,7 +101,7 @@ def _render_scene(image: Path, scene: dict[str, Any], output: Path, width: int, 
 
 def _concat_segments(segments: list[Path], output: Path) -> None:
     concat_file = output.with_suffix(".concat.txt")
-    lines = [f"file '{segment.as_posix()}'" for segment in segments]
+    lines = [f"file '{segment.resolve().as_posix()}'" for segment in segments]
     concat_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:
         _run([
