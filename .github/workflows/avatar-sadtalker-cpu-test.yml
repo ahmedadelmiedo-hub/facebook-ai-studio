@@ -1,0 +1,93 @@
+name: SadTalker CPU Diagnostic Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      script_file:
+        description: "Approved short script path"
+        required: true
+        default: "content/scripts/shorts/case-001-EP02-HOOK.txt"
+        type: string
+      episode_name:
+        description: "Output test name"
+        required: true
+        default: "case-001-EP02-SADTALKER-CPU-TEST"
+        type: string
+      avatar_max_characters:
+        description: "Maximum narration characters per Avatar segment"
+        required: true
+        default: "240"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
+      FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
+      AVATAR_PROVIDER: sadtalker
+      SADTALKER_ROOT: ${{ github.workspace }}/SadTalker
+      SADTALKER_PYTHON: ${{ github.workspace }}/.venv-sadtalker/bin/python
+      SADTALKER_CPU: "1"
+      SADTALKER_ENHANCER: ""
+      SADTALKER_STILL: "false"
+      AVATAR_SOURCE_IMAGE: ${{ github.workspace }}/storage/references/nour-master-v1.png
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install CPU SadTalker and project dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra
+          python -m venv .venv-sadtalker
+          "$SADTALKER_PYTHON" -m pip install --upgrade pip setuptools wheel
+          "$SADTALKER_PYTHON" -m pip install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1
+          git clone --depth 1 https://github.com/OpenTalker/SadTalker.git "$SADTALKER_ROOT"
+          "$SADTALKER_PYTHON" -m pip install -r "$SADTALKER_ROOT/requirements.txt"
+          "$SADTALKER_PYTHON" -m pip install -r requirements.txt
+          bash "$SADTALKER_ROOT/scripts/download_models.sh"
+      - name: Verify CPU SadTalker environment
+        run: |
+          test -n "$FISH_API_KEY"
+          test -n "$FISH_VOICE_ID"
+          test -f "$SADTALKER_ROOT/inference.py"
+          test -f "$AVATAR_SOURCE_IMAGE"
+          command -v ffmpeg
+          "$SADTALKER_PYTHON" -c 'import torch; print(torch.__version__); print("CPU diagnostic mode")'
+      - name: Run short CPU diagnostic
+        run: |
+          PYTHONPATH=. "$SADTALKER_PYTHON" -m core.autopilot \
+            --avatar-episode \
+            --avatar-provider sadtalker \
+            --avatar-source-image "$AVATAR_SOURCE_IMAGE" \
+            --script-file "${{ inputs.script_file }}" \
+            --voice "$FISH_VOICE_ID" \
+            --format long \
+            --episode-name "${{ inputs.episode_name }}" \
+            --output-dir storage/autopilot/avatar-sadtalker-cpu \
+            --character-file content/characters/nour-podcast-host-v1.json \
+            --scene-prompt "Nour narrates a short case from her podcast studio" \
+            --scene-camera "cinematic medium shot with microphone and evidence board" \
+            --avatar-max-characters "${{ inputs.avatar_max_characters }}" \
+            --review-status approved \
+            --keep-audio
+      - name: Validate diagnostic MP4
+        run: |
+          OUTPUT="$(find storage/autopilot/avatar-sadtalker-cpu -maxdepth 1 -type f -name '*.mp4' -print -quit)"
+          test -n "$OUTPUT"
+          test -s "$OUTPUT"
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height -of default=noprint_wrappers=1 "$OUTPUT"
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$OUTPUT"
+      - name: Upload diagnostic artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: avatar-sadtalker-cpu-${{ inputs.episode_name }}
+          path: storage/autopilot/avatar-sadtalker-cpu/

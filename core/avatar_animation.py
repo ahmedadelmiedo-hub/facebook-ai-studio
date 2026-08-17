@@ -204,6 +204,7 @@ class SadTalkerProvider:
             self.still = os.getenv("SADTALKER_STILL", "0").strip().lower() in {"1", "true", "yes", "on"}
         else:
             self.still = still
+        self.cpu = os.getenv("SADTALKER_CPU", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.timeout_seconds = timeout_seconds
 
     def _command(self, audio_path: Path, result_dir: Path) -> list[str]:
@@ -221,6 +222,8 @@ class SadTalkerProvider:
             command.extend(["--enhancer", self.enhancer])
         if self.still:
             command.append("--still")
+        if self.cpu:
+            command.append("--cpu")
         return command
 
     def create_talking_segment(

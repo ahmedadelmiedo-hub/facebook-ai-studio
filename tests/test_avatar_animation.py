@@ -61,6 +61,21 @@ class AvatarAnimationTests(unittest.TestCase):
             self.assertEqual(result, output)
             self.assertEqual(output.read_bytes(), b"fake-mp4")
 
+    def test_sadtalker_cpu_flag_is_forwarded(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / "nour.png"
+            image.write_bytes(b"fake-png")
+            (root / "inference.py").write_text("# fake SadTalker entrypoint\n", encoding="utf-8")
+            with patch.dict(os.environ, {"SADTALKER_CPU": "1"}, clear=True):
+                provider = SadTalkerProvider(
+                    source_image=image,
+                    repository_root=root,
+                    python_executable=sys.executable,
+                )
+                command = provider._command(root / "audio.wav", root / "result")
+                self.assertIn("--cpu", command)
+
     def test_factory_selects_sadtalker(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
