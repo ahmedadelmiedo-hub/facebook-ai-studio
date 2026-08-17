@@ -103,6 +103,19 @@ jobs:
             --review-status approved \
             --keep-audio
           test "$(find storage/autopilot/github-avatar-audio -maxdepth 1 -name '*.mp3' | wc -l)" -gt 0
+      - name: Create private Kaggle audio dataset
+        run: |
+          rm -rf .kaggle-audio-dataset
+          mkdir -p .kaggle-audio-dataset
+          cp storage/autopilot/github-avatar-audio/*.mp3 .kaggle-audio-dataset/
+          KERNEL_SLUG="${KERNEL_ID#*/}"
+          AUDIO_DATASET_ID="${KERNEL_ID%/*}/${KERNEL_SLUG}-audio"
+          printf '%s\n' "KAGGLE_AUDIO_DATASET_ID=$AUDIO_DATASET_ID" >> "$GITHUB_ENV"
+          jq -n \
+            --arg title "${KERNEL_SLUG}-audio" \
+            '{title:$title, id:$title, subtitle:"Private precomputed avatar audio", description:"Private audio segments for one Rowat Alwaqe SadTalker render.", licenses:[{name:"other"}]}' \
+            > .kaggle-audio-dataset/dataset-metadata.json
+          kaggle datasets create -p .kaggle-audio-dataset --dir-mode zip
       - name: Prepare Kaggle kernel package
         env:
           INPUT_SCRIPT: ${{ inputs.script_file }}
@@ -113,10 +126,8 @@ jobs:
         run: |
           rm -rf .kaggle-kernel kaggle-output
           mkdir -p .kaggle-kernel kaggle-output
+          KERNEL_SLUG="${KERNEL_ID#*/}"
           cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
-          python tools/embed_avatar_audio_in_notebook.py \
-            --notebook .kaggle-kernel/sadtalker_kaggle_gpu.ipynb \
-            --audio-dir storage/autopilot/github-avatar-audio
           jq -n \
             --arg script "$INPUT_SCRIPT" \
             --arg episode "$INPUT_EPISODE" \
@@ -124,7 +135,7 @@ jobs:
             --argjson max_characters "$INPUT_MAX_CHARACTERS" \
             --argjson run_short "$INPUT_RUN_SHORT" \
             --arg accelerator "$INPUT_ACCELERATOR" \
-            --arg audio_dir "audio_segments" \
+            --arg audio_dir "/kaggle/input/${KERNEL_SLUG}-audio" \
             '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator, audio_dir:$audio_dir, voice_id:"precomputed"}' \
             > .kaggle-kernel/job_config.json
           KERNEL_SLUG="${KERNEL_ID#*/}"
@@ -132,7 +143,8 @@ jobs:
             --arg id "$KERNEL_ID" \
             --arg title "$KERNEL_SLUG" \
             --arg machine_shape "$INPUT_ACCELERATOR" \
-            '{id:$id, title:$title, code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, machine_shape:$machine_shape, dataset_sources:[], competition_sources:[], kernel_sources:[]}' \
+            --arg dataset "$AUDIO_DATASET_ID" \
+            '{id:$id, title:$title, code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, machine_shape:$machine_shape, dataset_sources:[$dataset], competition_sources:[], kernel_sources:[]}' \
             > .kaggle-kernel/kernel-metadata.json
           jq empty .kaggle-kernel/job_config.json
           jq empty .kaggle-kernel/kernel-metadata.json
