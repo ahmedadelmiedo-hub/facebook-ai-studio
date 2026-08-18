@@ -177,6 +177,12 @@ jobs:
             rm -rf .kaggle-kernel
             mkdir -p .kaggle-kernel
             cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
+            # Kaggle kernel packages do not expose job_config.json as /kaggle/working.
+            # Patch the generated notebook defaults so each run receives its exact range.
+            sed -i \
+              -e "s/\\\\\"segment_start\\\\\": 1,/\\\\\"segment_start\\\\\": ${PART_START},/" \
+              -e "s/\\\\\"segment_end\\\\\": 0,/\\\\\"segment_end\\\\\": ${PART_END},/" \
+              .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
             jq -n \
               --arg script "$INPUT_SCRIPT" \
               --arg episode "$PART_EPISODE" \
