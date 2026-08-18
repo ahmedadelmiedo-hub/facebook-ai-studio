@@ -30,18 +30,18 @@
       "updated_at": "2026-08-12T23:37:58.789691+00:00"
     },
     "case-001-EP02-HOOK": {
-      "status": "scheduled",
+      "status": "published",
       "scheduled_at": "2026-08-17T12:00:00Z",
       "video_id": "4xjkZCAlI7c",
       "playlist_id": "",
-      "updated_at": "2026-08-16T13:25:09.594077+00:00"
+      "updated_at": "2026-08-18T17:53:44+00:00"
     },
     "case-001-EP02": {
-      "status": "scheduled",
-      "scheduled_at": "2026-08-16T13:38:28.927374Z",
-      "video_id": "lfrZq27qVvU",
-      "playlist_id": "PLTb92wqB4E1w",
-      "updated_at": "2026-08-16T13:49:02.048733+00:00"
+      "status": "published",
+      "scheduled_at": "2026-08-18T17:53:44Z",
+      "video_id": "zz51Vi04Fxs",
+      "playlist_id": "PLDBZcFjhc4Bk",
+      "updated_at": "2026-08-18T17:53:44+00:00"
     }
   }
 }
