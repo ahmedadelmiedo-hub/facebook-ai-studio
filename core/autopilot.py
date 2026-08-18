@@ -21,7 +21,7 @@ from core.avatar_animation import build_avatar_provider
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.character_consistency import build_scene_manifest, load_character_bible
 from core.performance_planner import split_script_into_performance_segments, write_performance_plan
-from core.scene_renderer import probe_duration, render_avatar_episode, render_visual_video
+from core.scene_renderer import prepend_video_intro, probe_duration, render_avatar_episode, render_visual_video
 
 LOGGER = logging.getLogger("facebook_ai_studio.autopilot")
 DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. جثة في شقة مهجورة في طنطا.
@@ -31,6 +31,8 @@ DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. ج
 DEFAULT_OUTPUT_DIR = Path("storage/autopilot")
 DEFAULT_MODEL = "s2.1-pro-free"
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SHORTS_INTRO_PATH = REPO_ROOT / "storage" / "references" / "rowat-shorts-intro-v1.gif"
 
 
 async def async_to_thread(func, /, *args, **kwargs):
@@ -474,6 +476,19 @@ def render_video(audio_path: Path, video_path: Path, settings: Settings) -> None
     finally:
         video.close()
         audio.close()
+    if settings.profile.name == "short":
+        if not SHORTS_INTRO_PATH.is_file() or SHORTS_INTRO_PATH.stat().st_size == 0:
+            raise FileNotFoundError(f"Shorts intro not found or empty: {SHORTS_INTRO_PATH}")
+        intro_output = video_path.with_suffix(".with-intro.mp4")
+        prepend_video_intro(
+            video_path,
+            SHORTS_INTRO_PATH,
+            intro_output,
+            width=settings.profile.canvas[0],
+            height=settings.profile.canvas[1],
+            fps=settings.fps,
+        )
+        intro_output.replace(video_path)
 
 
 def write_visual_scene_manifest(settings: Settings, video_path: Path) -> Path | None:

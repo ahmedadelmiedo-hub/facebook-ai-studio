@@ -113,6 +113,84 @@ def _concat_segments(segments: list[Path], output: Path) -> None:
         concat_file.unlink(missing_ok=True)
 
 
+def prepend_video_intro(
+    video_path: Path,
+    intro_path: Path,
+    output_path: Path,
+    *,
+    width: int = 1080,
+    height: int = 1920,
+    fps: int = 24,
+) -> None:
+    """Prepend a silent vertical intro to a video while preserving the main audio afterward."""
+    if not video_path.is_file() or video_path.stat().st_size == 0:
+        raise FileNotFoundError(f"main video not found or empty: {video_path}")
+    if not intro_path.is_file() or intro_path.stat().st_size == 0:
+        raise FileNotFoundError(f"intro not found or empty: {intro_path}")
+    if width <= 0 or height <= 0 or fps <= 0:
+        raise ValueError("intro composition dimensions and fps must be positive")
+
+    intro_duration = probe_duration(intro_path)
+    if intro_duration <= 0:
+        raise RenderError(f"intro has no usable duration: {intro_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    same_path = video_path.resolve() == output_path.resolve()
+    with TemporaryDirectory(prefix="shorts-intro-") as temp_dir:
+        temp_output = Path(temp_dir) / "with-intro.mp4"
+        final_target = temp_output if same_path else output_path
+        filter_graph = (
+            f"[0:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p[intro_v];"
+            f"[1:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p[main_v];"
+            f"[2:a]atrim=duration={intro_duration:.3f},asetpts=PTS-STARTPTS[intro_a];"
+            "[1:a]aresample=async=1:first_pts=0[main_a];"
+            "[intro_v][intro_a][main_v][main_a]concat=n=2:v=1:a=1[out_v][out_a]"
+        )
+        _run(
+            [
+                "ffmpeg",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(intro_path),
+                "-i",
+                str(video_path),
+                "-f",
+                "lavfi",
+                "-t",
+                f"{intro_duration:.3f}",
+                "-i",
+                "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-filter_complex",
+                filter_graph,
+                "-map",
+                "[out_v]",
+                "-map",
+                "[out_a]",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "22",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+                str(final_target),
+            ]
+        )
+        if same_path:
+            temp_output.replace(output_path)
+
+
 def mux_audio_and_captions(
     video_path: Path,
     audio_path: Path,
