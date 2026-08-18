@@ -1,0 +1,74 @@
+name: GitHub Actions Status Monitor
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: github-actions-status-monitor
+  cancel-in-progress: true
+
+jobs:
+  check-workflows:
+    name: Check production workflow status
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect recent production runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          now="$(date -u +%s)"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" > /tmp/runs.json
+          jq --argjson now "$now" '
+            [
+              .workflow_runs[]
+              | select(
+                  (.name == "رواة الواقع - الإنتاج والنشر التلقائي"
+                   or .name == "Fish Audio Episode and YouTube Publish"
+                   or .name == "Kaggle GPU Avatar Episode and YouTube Publish")
+                  and (
+                    .conclusion == "failure"
+                    or .conclusion == "cancelled"
+                    or (
+                      (.status == "queued" or .status == "in_progress")
+                      and (($now - (((.run_started_at // .created_at) | fromdateiso8601))) > 7200)
+                    )
+                  )
+                )
+              | {
+                  id,
+                  name,
+                  status,
+                  conclusion,
+                  created_at,
+                  updated_at,
+                  html_url
+                }
+            ]
+          ' /tmp/runs.json > /tmp/problem-runs.json
+
+          {
+            echo "## GitHub Actions status check"
+            echo
+            echo "Checked at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          problem_count="$(jq 'length' /tmp/problem-runs.json)"
+          if [ "$problem_count" -gt 0 ]; then
+            echo "### Problems detected: $problem_count" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.[] | "- [\(.name) #\(.id)](\(.html_url)) — status=\(.status), conclusion=\(.conclusion // "-")"' /tmp/problem-runs.json >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::One or more monitored production workflows failed, were cancelled, or remained active for more than two hours. See the job summary for links."
+            exit 1
+          fi
+
+          echo "### All monitored production workflows are healthy" >> "$GITHUB_STEP_SUMMARY"
+          echo "No failure, cancellation, or stale run older than two hours was found in the latest 100 runs." >> "$GITHUB_STEP_SUMMARY"
