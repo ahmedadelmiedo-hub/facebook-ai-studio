@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import http.client
 import json
 import logging
 import os
@@ -321,7 +322,13 @@ def fish_audio_request(settings: Settings, audio_path: Path) -> None:
     )
     try:
         with urllib.request.urlopen(request, timeout=120) as response:
-            audio_path.write_bytes(response.read())
+            try:
+                audio_bytes = response.read()
+            except http.client.IncompleteRead as exc:
+                raise RuntimeError(
+                    f"Fish Audio returned an incomplete response ({len(exc.partial)} bytes); retrying"
+                ) from exc
+            audio_path.write_bytes(audio_bytes)
     except urllib.error.HTTPError as exc:
         details = exc.read(400).decode("utf-8", errors="replace")
         raise RuntimeError(f"Fish Audio returned HTTP {exc.code}: {details}") from exc
