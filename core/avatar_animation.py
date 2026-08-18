@@ -260,8 +260,10 @@ class SadTalkerProvider:
             raise AvatarProviderError(f"SadTalker process could not start: {exc}") from exc
 
         if completed.returncode != 0:
-            details = (completed.stderr or completed.stdout or "unknown SadTalker error").strip()
-            raise AvatarProviderError(f"SadTalker failed ({completed.returncode}): {details[-1200:]}")
+            details = "\n".join(part for part in (completed.stderr, completed.stdout) if part).strip()
+            diagnostic = details[-12000:] if details else "unknown SadTalker error"
+            print("SadTalker process diagnostic:\n" + diagnostic, flush=True)
+            raise AvatarProviderError(f"SadTalker failed ({completed.returncode}): {diagnostic}")
 
         candidates = sorted(result_dir.rglob("*.mp4"), key=lambda item: item.stat().st_mtime, reverse=True)
         if not candidates:
