@@ -99,6 +99,9 @@ def find_or_create_story_plan(
         if not isinstance(item, dict) or str(item.get("status", "queued")) not in {"queued", "planning"}:
             continue
         story_id = sanitize_story_id(str(item.get("story_id", "")))
+        plan_path = content_root / "production" / story_id / "series_plan.json"
+        if plan_path.exists() and story_is_complete(content_root, story_id):
+            continue
         build_series(
             writer_settings_for(content_root, dry_run=dry_run),
             story_id=story_id,
@@ -146,6 +149,39 @@ def first_pending_short_asset(
     return min(candidates, key=lambda item: (item.scheduled_at, item.part_number, item.asset_id))
 
 
+def next_pending_asset(
+    assets: list[PublishableAsset],
+    state: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> PublishableAsset:
+    """Return one next asset and make its immediate-public slot explicit.
+
+    Scheduled runs fire four times per day. Each firing publishes exactly one pending
+    asset so long episodes and their three planned Shorts are spread across runs without
+    uploading the whole day's queue at once. The story planner still controls the number
+    of episodes for each story.
+    """
+    completed = state.get("assets", {})
+    candidates = [
+        asset for asset in assets
+        if completed.get(asset.asset_id, {}).get("status") not in DONE_STATUSES
+    ]
+    if not candidates:
+        raise RuntimeError("no pending asset is available")
+    first = min(
+        candidates,
+        key=lambda item: (
+            item.part_number,
+            0 if item.content_format == "long" else 1,
+            item.scheduled_at,
+            item.asset_id,
+        ),
+    )
+    publish_at = (now or datetime.now(UTC)).astimezone(UTC).isoformat().replace("+00:00", "Z")
+    return replace(first, scheduled_at=publish_at)
+
+
 def render_asset(asset: PublishableAsset, *, content_root: Path, output_root: Path) -> Path:
     """Render one planned asset through the existing Fish Audio + MoviePy path."""
     args = build_autopilot_parser().parse_args(
@@ -177,6 +213,7 @@ def run_daily(
     publish_first_now: bool = False,
     publish_short_now: bool = False,
     publish_long_now: bool = False,
+    publish_next: bool = False,
 ) -> list[dict[str, Any]]:
     """Produce and publish the assets due on the Cairo calendar date."""
     story_id = find_or_create_story_plan(
@@ -191,6 +228,8 @@ def run_daily(
         due = [first_pending_long_asset(assets, state, now=target_date)]
     elif publish_short_now:
         due = [first_pending_short_asset(assets, state)]
+    elif publish_next:
+        due = [next_pending_asset(assets, state, now=target_date)]
     elif initial_launch:
         due = [first_pending_long_asset(assets, state, now=target_date)]
     else:
@@ -247,6 +286,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Publish the earliest pending long episode immediately as public.",
     )
+    parser.add_argument(
+        "--publish-next",
+        action="store_true",
+        help="Publish exactly one next pending asset immediately; used by the four-times-daily scheduler.",
+    )
     return parser
 
 
@@ -262,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
             publish_first_now=args.publish_first_now,
             publish_short_now=args.publish_short_now,
             publish_long_now=args.publish_long_now,
+            publish_next=args.publish_next,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}")

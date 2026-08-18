@@ -2,8 +2,9 @@ name: رواة الواقع - الإنتاج والنشر التلقائي
 
 on:
   schedule:
-    # The runner wakes daily; the generated Cairo-time plan decides which assets are due.
-    - cron: "0 3 * * *"
+    # Four Cairo-day slots; each run publishes one next pending asset.
+    # GitHub cron is UTC; these are 00:00, 06:00, 12:00, and 18:00 UTC.
+    - cron: "0 0,6,12,18 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -85,7 +86,7 @@ jobs:
           elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             python -m core.automation --publish-first-now
           else
-            python -m core.automation
+            python -m core.automation --publish-next
           fi
       - name: Persist generated scripts and publication state
         run: |
