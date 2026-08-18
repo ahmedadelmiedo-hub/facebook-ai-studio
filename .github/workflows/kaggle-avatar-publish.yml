@@ -1,13 +1,8 @@
-name: Kaggle GPU Avatar Episode and YouTube Publish
+name: Fish Audio Episode and YouTube Publish
 
 on:
   workflow_dispatch:
     inputs:
-      kaggle_kernel_id:
-        description: "Kaggle kernel ID: your-kaggle-username/sadtalker-rowat-alwaqe"
-        required: true
-        default: "YOUR_KAGGLE_USERNAME/sadtalker-rowat-alwaqe"
-        type: string
       script_file:
         description: "Approved script path in the repository"
         required: true
@@ -16,42 +11,24 @@ on:
       episode_name:
         description: "Output episode name"
         required: true
-        default: "case-001-EP02-SADTALKER-KAGGLE-FULL"
+        default: "case-001-EP02-FISH-AUDIO-FULL"
         type: string
-      avatar_max_characters:
-        description: "Maximum narration characters per Avatar segment"
-        required: true
-        default: "1400"
-        type: string
-      run_short:
-        description: "Run the Short smoke test before the full episode"
-        required: true
-        default: false
-        type: boolean
       title:
         description: "YouTube title"
         required: true
         default: "ملف الرصد 17 | الحلقة 02 | رواة الواقع"
         type: string
-      accelerator:
-        description: "Kaggle free GPU accelerator"
-        required: true
-        default: "NvidiaTeslaT4"
-        type: choice
-        options:
-          - NvidiaTeslaP100
-          - NvidiaTeslaT4
 
 permissions:
   contents: read
 
 jobs:
-  kaggle-gpu-and-publish:
+  fish-audio-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 60
     env:
-      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-      KERNEL_ID: ${{ inputs.kaggle_kernel_id }}
+      FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
+      FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
@@ -63,213 +40,51 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install Kaggle CLI
-        run: python -m pip install --upgrade kaggle
+      - name: Install production dependencies
+        run: python -m pip install -r requirements.txt
       - name: Verify non-secret configuration
-        run: |
-          test -n "$KAGGLE_API_TOKEN"
-          test -n "$KERNEL_ID"
-          test "$KERNEL_ID" != "YOUR_KAGGLE_USERNAME/sadtalker-rowat-alwaqe"
-          test -n "$YOUTUBE_CLIENT_ID"
-          test -n "$YOUTUBE_CLIENT_SECRET"
-          test -n "$YOUTUBE_REFRESH_TOKEN"
-      - name: Generate Avatar audio segments on GitHub
-        env:
-          FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
-          FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
-          INPUT_SCRIPT: ${{ inputs.script_file }}
-          INPUT_EPISODE: ${{ inputs.episode_name }}
-          INPUT_MAX_CHARACTERS: ${{ inputs.avatar_max_characters }}
         run: |
           set -euo pipefail
           test -n "$FISH_API_KEY"
           test -n "$FISH_VOICE_ID"
-          rm -rf storage/autopilot/github-avatar-audio
-          mkdir -p storage/autopilot/github-avatar-audio
+          test -n "$YOUTUBE_CLIENT_ID"
+          test -n "$YOUTUBE_CLIENT_SECRET"
+          test -n "$YOUTUBE_REFRESH_TOKEN"
+      - name: Generate Fish Audio narration
+        env:
+          INPUT_SCRIPT: ${{ inputs.script_file }}
+          INPUT_EPISODE: ${{ inputs.episode_name }}
+        run: |
+          set -euo pipefail
+          rm -rf storage/autopilot/fish-audio
+          mkdir -p storage/autopilot/fish-audio
           PYTHONPATH=. python -m core.autopilot \
-            --avatar-episode \
-            --avatar-audio-only \
-            --avatar-provider sadtalker \
-            --avatar-source-image storage/references/nour-master-v1.png \
-            --avatar-audio-dir storage/autopilot/github-avatar-audio \
+            --audio-only \
             --script-file "$INPUT_SCRIPT" \
             --voice "$FISH_VOICE_ID" \
             --format long \
             --episode-name "$INPUT_EPISODE" \
-            --output-dir storage/autopilot/github-avatar-audio \
-            --character-file content/characters/nour-podcast-host-v1.json \
-            --scene-prompt "Nour narrates the case from her podcast studio" \
-            --scene-camera "cinematic medium shot with microphone and evidence board" \
-            --avatar-max-characters "$INPUT_MAX_CHARACTERS" \
+            --output-dir storage/autopilot/fish-audio \
             --review-status approved \
+            --tts-max-characters 2800 \
             --keep-audio
-          test "$(find storage/autopilot/github-avatar-audio -maxdepth 1 -name '*.mp3' | wc -l)" -gt 0
-          AVATAR_SEGMENT_COUNT="$(find storage/autopilot/github-avatar-audio -maxdepth 1 -type f -name 'A*.mp3' | wc -l)"
-          test "$AVATAR_SEGMENT_COUNT" -gt 0
-          echo "AVATAR_SEGMENT_COUNT=$AVATAR_SEGMENT_COUNT" >> "$GITHUB_ENV"
-          echo "Prepared $AVATAR_SEGMENT_COUNT avatar segment(s)."
-      - name: Create private Kaggle audio dataset
-        run: |
-          set -euo pipefail
-          rm -rf .kaggle-audio-dataset
-          mkdir -p .kaggle-audio-dataset
-          cp storage/autopilot/github-avatar-audio/*.mp3 .kaggle-audio-dataset/
-          KERNEL_SLUG="${KERNEL_ID#*/}"
-          AUDIO_DATASET_ID="${KERNEL_ID%/*}/${KERNEL_SLUG}-audio"
-          printf '%s\n' "KAGGLE_AUDIO_DATASET_ID=$AUDIO_DATASET_ID" >> "$GITHUB_ENV"
-          jq -n \
-            --arg id "$AUDIO_DATASET_ID" \
-            --arg title "${KERNEL_SLUG}-audio" \
-            '{title:$title, id:$id, subtitle:"Private precomputed avatar audio", description:"Private audio segments for one Rowat Alwaqe SadTalker render.", licenses:[{name:"other"}]}' \
-            > .kaggle-audio-dataset/dataset-metadata.json
-          kaggle datasets create -p .kaggle-audio-dataset --dir-mode zip
-          dataset_ready=false
-          for attempt in $(seq 1 12); do
-            dataset_status="$(kaggle datasets status -d "$AUDIO_DATASET_ID" 2>&1 || true)"
-            echo "Dataset status check ${attempt}/12: ${dataset_status}"
-            normalized_status="$(printf '%s' "$dataset_status" | tr '[:upper:]' '[:lower:]')"
-            if printf '%s' "$normalized_status" | grep -Eqi 'ready|complete|success'; then
-              dataset_ready=true
-              break
-            fi
-            if printf '%s' "$normalized_status" | grep -Eqi '403|forbidden'; then
-              echo "Kaggle status endpoint is forbidden for this token; waiting 90s for dataset processing before kernel push."
-              sleep 90
-              dataset_ready=true
-              break
-            fi
-            if printf '%s' "$normalized_status" | grep -Eqi 'error|failed|invalid|not found|unauthorized'; then
-              echo "Kaggle audio dataset did not become available: ${dataset_status}"
-              exit 1
-            fi
-            sleep 15
-          done
-          if [ "$dataset_ready" != "true" ]; then
-            echo "Kaggle audio dataset was not ready after waiting."
-            exit 1
-          fi
-      - name: Render and download Kaggle avatar parts
+          AUDIO_PATH="storage/autopilot/fish-audio/${INPUT_EPISODE}.mp3"
+          test -s "$AUDIO_PATH"
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$AUDIO_PATH"
+          echo "AUDIO_PATH=$AUDIO_PATH" >> "$GITHUB_ENV"
+      - name: Render landscape episode with Arabic captions
         env:
           INPUT_SCRIPT: ${{ inputs.script_file }}
           INPUT_EPISODE: ${{ inputs.episode_name }}
-          INPUT_MAX_CHARACTERS: ${{ inputs.avatar_max_characters }}
-          INPUT_RUN_SHORT: ${{ inputs.run_short }}
-          INPUT_ACCELERATOR: ${{ inputs.accelerator }}
         run: |
           set -euo pipefail
-          AUDIO_DATASET_ID="$KAGGLE_AUDIO_DATASET_ID"
-          test -n "$AUDIO_DATASET_ID"
-          test "${AVATAR_SEGMENT_COUNT:-0}" -gt 0
-          KERNEL_SLUG="${KERNEL_ID#*/}"
-          PART_SIZE=5
-          PART_START=1
-          PART_NUMBER=1
-          rm -rf .kaggle-kernel kaggle-output storage/autopilot/kaggle-import
-          mkdir -p .kaggle-kernel kaggle-output storage/autopilot/kaggle-import
-
-          while [ "$PART_START" -le "$AVATAR_SEGMENT_COUNT" ]; do
-            PART_END=$((PART_START + PART_SIZE - 1))
-            if [ "$PART_END" -gt "$AVATAR_SEGMENT_COUNT" ]; then
-              PART_END="$AVATAR_SEGMENT_COUNT"
-            fi
-            PART_EPISODE="${INPUT_EPISODE}-PART-${PART_NUMBER}"
-            echo "Rendering avatar segments ${PART_START}-${PART_END} as ${PART_EPISODE}."
-            rm -rf .kaggle-kernel
-            mkdir -p .kaggle-kernel
-            cp notebooks/sadtalker_kaggle_gpu.ipynb .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
-            # Kaggle kernel packages do not expose job_config.json as /kaggle/working.
-            # Patch the generated notebook defaults so each run receives its exact range.
-            sed -i \
-              -e "s/\\\\\"segment_start\\\\\": 1,/\\\\\"segment_start\\\\\": ${PART_START},/" \
-              -e "s/\\\\\"segment_end\\\\\": 0,/\\\\\"segment_end\\\\\": ${PART_END},/" \
-              .kaggle-kernel/sadtalker_kaggle_gpu.ipynb
-            jq -n \
-              --arg script "$INPUT_SCRIPT" \
-              --arg episode "$PART_EPISODE" \
-              --arg output "storage/autopilot/avatar-sadtalker-kaggle-full" \
-              --argjson max_characters "$INPUT_MAX_CHARACTERS" \
-              --argjson run_short "$INPUT_RUN_SHORT" \
-              --arg accelerator "$INPUT_ACCELERATOR" \
-              --arg audio_dataset_id "$AUDIO_DATASET_ID" \
-              --arg audio_dir "/kaggle/input/${KERNEL_SLUG}-audio" \
-              --argjson segment_start "$PART_START" \
-              --argjson segment_end "$PART_END" \
-              '{script_file:$script, episode_name:$episode, output_dir:$output, max_characters:$max_characters, run_short:$run_short, accelerator:$accelerator, audio_dataset_id:$audio_dataset_id, audio_dir:$audio_dir, segment_start:$segment_start, segment_end:$segment_end, voice_id:"precomputed"}' \
-              > .kaggle-kernel/job_config.json
-            jq -n \
-              --arg id "$KERNEL_ID" \
-              --arg title "$KERNEL_SLUG" \
-              --arg machine_shape "$INPUT_ACCELERATOR" \
-              --arg dataset "$AUDIO_DATASET_ID" \
-              '{id:$id, title:$title, code_file:"sadtalker_kaggle_gpu.ipynb", language:"python", kernel_type:"notebook", is_private:true, enable_gpu:true, enable_tpu:false, enable_internet:true, machine_shape:$machine_shape, dataset_sources:[$dataset], competition_sources:[], kernel_sources:[]}' \
-              > .kaggle-kernel/kernel-metadata.json
-            jq empty .kaggle-kernel/job_config.json
-            jq empty .kaggle-kernel/kernel-metadata.json
-
-            pushed=false
-            for attempt in 1 2 3 4 5; do
-              if kaggle kernels push -p .kaggle-kernel --accelerator "$INPUT_ACCELERATOR" --timeout 10800; then
-                pushed=true
-                break
-              fi
-              echo "Kaggle Push attempt ${attempt}/5 failed; retrying after backoff."
-              sleep $((attempt * 20))
-            done
-            if [ "$pushed" != "true" ]; then
-              echo "Kaggle Push failed after 5 attempts."
-              exit 1
-            fi
-
-            max_attempts=180
-            completed=false
-            rm -rf "kaggle-output/status-part-${PART_NUMBER}" "kaggle-output/raw-part-${PART_NUMBER}"
-            mkdir -p "kaggle-output/status-part-${PART_NUMBER}" "kaggle-output/raw-part-${PART_NUMBER}"
-            for attempt in $(seq 1 "$max_attempts"); do
-              status_output="$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)"
-              normalized_status="$(printf '%s' "$status_output" | tr '[:upper:]' '[:lower:]')"
-              printf '%s\n' "$status_output" | tee "kaggle-output/status-part-${PART_NUMBER}/check-${attempt}.txt"
-              {
-                echo "### Kaggle ${PART_EPISODE} status check ${attempt}/${max_attempts}"
-                echo '```text'
-                printf '%s\n' "$status_output"
-                echo '```'
-              } >> "$GITHUB_STEP_SUMMARY"
-              if printf '%s' "$normalized_status" | grep -Eqi 'error|failed|cancelled|canceled|dead|invalid|not found|unauthorized'; then
-                echo "Kaggle kernel returned a terminal failure state for ${PART_EPISODE}."
-                exit 1
-              fi
-              if printf '%s' "$normalized_status" | grep -Eqi 'complete|succeeded|success'; then
-                completed=true
-                break
-              fi
-              if [ "$attempt" -lt "$max_attempts" ]; then
-                sleep 60
-              fi
-            done
-            if [ "$completed" != "true" ]; then
-              echo "Kaggle part ${PART_EPISODE} did not complete within ${max_attempts} minutes."
-              exit 1
-            fi
-
-            kaggle kernels output "$KERNEL_ID" --path "kaggle-output/raw-part-${PART_NUMBER}" --force --file-pattern '.*\.mp4$'
-            PART_VIDEO="$(find "kaggle-output/raw-part-${PART_NUMBER}" -type f -name '*.mp4' -print -quit)"
-            test -n "$PART_VIDEO"
-            cp "$PART_VIDEO" "storage/autopilot/kaggle-import/${INPUT_EPISODE}-part-${PART_NUMBER}.mp4"
-            PART_START=$((PART_END + 1))
-            PART_NUMBER=$((PART_NUMBER + 1))
-          done
-
-          CONCAT_LIST="kaggle-output/concat-list.txt"
-          : > "$CONCAT_LIST"
-          while IFS= read -r part_file; do
-            printf "file '%s'\n" "$(realpath "$part_file")" >> "$CONCAT_LIST"
-          done < <(find storage/autopilot/kaggle-import -maxdepth 1 -type f -name "${INPUT_EPISODE}-part-*.mp4" -print | sort -V)
-          test -s "$CONCAT_LIST"
-          VIDEO_PATH="storage/autopilot/kaggle-import/${INPUT_EPISODE}.mp4"
-          if ! ffmpeg -y -v error -f concat -safe 0 -i "$CONCAT_LIST" -c copy "$VIDEO_PATH"; then
-            ffmpeg -y -v error -f concat -safe 0 -i "$CONCAT_LIST" -c:v libx264 -preset veryfast -c:a aac -movflags +faststart "$VIDEO_PATH"
-          fi
+          VIDEO_PATH="storage/autopilot/fish-audio/${INPUT_EPISODE}.mp4"
+          PYTHONPATH=. python tools/render_fish_episode.py \
+            --audio "$AUDIO_PATH" \
+            --script "$INPUT_SCRIPT" \
+            --output "$VIDEO_PATH"
           test -s "$VIDEO_PATH"
+          test -s "${VIDEO_PATH%.mp4}.ass"
           echo "VIDEO_PATH=$VIDEO_PATH" >> "$GITHUB_ENV"
       - name: Quality gate for episode MP4
         run: |
@@ -278,19 +93,19 @@ jobs:
           ffmpeg -v error -i "$VIDEO_PATH" -f null -
           ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height -of default=noprint_wrappers=1 "$VIDEO_PATH"
           ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$VIDEO_PATH"
-      - name: Install YouTube uploader dependencies
-        run: python -m pip install -r requirements.txt
       - name: Upload episode to YouTube as Public
+        env:
+          INPUT_EPISODE: ${{ inputs.episode_name }}
+          INPUT_TITLE: ${{ inputs.title }}
         run: |
+          set -euo pipefail
           PYTHONPATH=. python tools/upload_episode_public.py \
             --video "$VIDEO_PATH" \
-            --asset-id "${{ inputs.episode_name }}" \
-            --title "${{ inputs.title }}"
+            --asset-id "$INPUT_EPISODE" \
+            --title "$INPUT_TITLE"
       - name: Upload production artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: kaggle-avatar-${{ inputs.episode_name }}
+          name: fish-audio-${{ inputs.episode_name }}
           path: |
-            storage/autopilot/kaggle-import/
-            storage/autopilot/github-avatar-audio/
-            kaggle-output/
+            storage/autopilot/fish-audio/
