@@ -21,7 +21,7 @@ on:
       avatar_max_characters:
         description: "Maximum narration characters per Avatar segment"
         required: true
-        default: "900"
+        default: "1400"
         type: string
       run_short:
         description: "Run the Short smoke test before the full episode"
@@ -194,7 +194,9 @@ jobs:
           fi
       - name: Wait for Kaggle kernel completion
         run: |
-          max_attempts=60
+          # A full SadTalker episode can exceed one hour on a free T4.
+          # Keep the GitHub job alive long enough to retrieve the completed MP4.
+          max_attempts=180
           completed=false
           mkdir -p kaggle-output/status
           for attempt in $(seq 1 "$max_attempts"); do
