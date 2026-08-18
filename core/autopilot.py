@@ -214,7 +214,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--avatar-source-url", default=os.getenv("D_ID_SOURCE_URL", ""), help="HTTPS image URL used by the D-ID provider")
     parser.add_argument("--avatar-source-image", type=Path, default=Path(os.getenv("AVATAR_SOURCE_IMAGE")) if os.getenv("AVATAR_SOURCE_IMAGE") else None, help="Local Nour portrait used by SadTalker")
     parser.add_argument("--avatar-audio-dir", type=Path, default=Path(os.getenv("AVATAR_AUDIO_DIR")) if os.getenv("AVATAR_AUDIO_DIR") else None, help="Precomputed Fish Audio MP3 segments for Avatar rendering")
-    parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "900")), help="Maximum narration characters per Avatar segment")
+    parser.add_argument("--avatar-max-characters", type=int, default=int(os.getenv("AVATAR_MAX_CHARACTERS", "1400")), help="Maximum narration characters per Avatar segment")
     return parser
 
 
@@ -529,9 +529,31 @@ def _avatar_segment_settings(settings: Settings, text: str) -> Settings:
     )
 
 
+def _select_avatar_segment_range(segments: list, episode_name: str) -> list:
+    """Select a stable inclusive segment range for resumable Kaggle renders."""
+    raw_start = os.getenv("AVATAR_SEGMENT_START", "1").strip()
+    raw_end = os.getenv("AVATAR_SEGMENT_END", "0").strip()
+    try:
+        start = int(raw_start)
+        end = int(raw_end)
+    except ValueError as exc:
+        raise ValueError("AVATAR_SEGMENT_START and AVATAR_SEGMENT_END must be integers") from exc
+    if start < 1 or end < 0 or (end and end < start):
+        raise ValueError("invalid avatar segment range")
+    selected = [
+        segment for segment in segments
+        if start <= int(segment.segment_id[1:]) and (end == 0 or int(segment.segment_id[1:]) <= end)
+    ]
+    if not selected:
+        raise ValueError(f"No avatar segments selected for {episode_name}: {start}-{end or 'end'}")
+    LOGGER.info("Avatar segment range %s-%s: %s segment(s)", start, end or "end", len(selected))
+    return selected
+
+
 async def run_avatar_episode(settings: Settings, video_path: Path) -> Path:
-    """Create per-sentence audio/avatar segments, then compose a captioned episode."""
-    segments = split_script_into_performance_segments(settings.script, settings.avatar_max_characters)
+    """Create selected audio/avatar segments, then compose a captioned episode."""
+    all_segments = split_script_into_performance_segments(settings.script, settings.avatar_max_characters)
+    segments = _select_avatar_segment_range(all_segments, settings.episode_name)
     avatar_dir = settings.output_dir / f".{settings.episode_name}_avatar"
     avatar_dir.mkdir(parents=True, exist_ok=True)
     write_performance_plan(
