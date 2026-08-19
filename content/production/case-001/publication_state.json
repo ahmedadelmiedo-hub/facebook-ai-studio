@@ -63,6 +63,13 @@
       "video_id": "5k2eU71N3Hs",
       "playlist_id": "",
       "updated_at": "2026-08-19T11:34:13.437803+00:00"
+    },
+    "case-001-EP03": {
+      "status": "scheduled",
+      "scheduled_at": "2026-08-20T18:00:00Z",
+      "video_id": "vaKjE1ozohY",
+      "playlist_id": "PLTb92wqB4E1w",
+      "updated_at": "2026-08-19T12:45:18.774120+00:00"
     }
   }
 }
