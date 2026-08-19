@@ -75,6 +75,11 @@ jobs:
           cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core fonts-noto-extra
+          ffprobe -version
       - name: Run autonomous content job
         env:
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
