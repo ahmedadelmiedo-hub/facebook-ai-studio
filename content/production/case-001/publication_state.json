@@ -49,6 +49,13 @@
       "video_id": "GKUyHz9J39M",
       "playlist_id": "",
       "updated_at": "2026-08-19T00:52:38.113346+00:00"
+    },
+    "case-001-EP02-CLIFFHANGER": {
+      "status": "scheduled",
+      "scheduled_at": "2026-08-19T14:00:00Z",
+      "video_id": "NyOGGoe0yrU",
+      "playlist_id": "",
+      "updated_at": "2026-08-19T10:58:24.862056+00:00"
     }
   }
 }
