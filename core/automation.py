@@ -6,6 +6,8 @@ import argparse
 import asyncio
 import json
 import os
+import subprocess
+import sys
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -182,8 +184,34 @@ def next_pending_asset(
     return replace(first, scheduled_at=publish_at)
 
 
+def ensure_asset_script(asset: PublishableAsset, *, content_root: Path) -> Path:
+    """Generate one missing planned script before rendering, without rebuilding published assets."""
+    script_path = content_root / asset.script_file
+    if script_path.is_file() and script_path.stat().st_size > 0:
+        return script_path
+
+    repair_tool = Path(__file__).resolve().parents[1] / "tools" / "repair_missing_scripts.py"
+    if not repair_tool.is_file():
+        raise FileNotFoundError(f"script repair tool not found: {repair_tool}")
+    subprocess.run(
+        [
+            sys.executable,
+            str(repair_tool),
+            "--asset-id",
+            asset.asset_id,
+            "--content-root",
+            str(content_root),
+        ],
+        check=True,
+    )
+    if not script_path.is_file() or script_path.stat().st_size == 0:
+        raise FileNotFoundError(f"script repair completed without creating: {script_path}")
+    return script_path
+
+
 def render_asset(asset: PublishableAsset, *, content_root: Path, output_root: Path) -> Path:
     """Render one planned asset through the existing Fish Audio + MoviePy path."""
+    ensure_asset_script(asset, content_root=content_root)
     args = build_autopilot_parser().parse_args(
         [
             "--script-file",
