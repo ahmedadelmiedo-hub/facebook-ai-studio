@@ -17,6 +17,11 @@ on:
         required: true
         default: false
         type: boolean
+      publish_next:
+        description: "اختبار الأصل التالي حسب الخطة مع احترام موعد YouTube المجدول"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -64,6 +69,7 @@ jobs:
       YOUTUBE_CATEGORY_ID: "22"
       YOUTUBE_NOTIFY_SUBSCRIBERS: "true"
       PUBLISH_SHORT_NOW: ${{ inputs.publish_short_now }}
+      PUBLISH_NEXT: ${{ inputs.publish_next }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -85,6 +91,8 @@ jobs:
             python -m core.automation --dry-run
           elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$PUBLISH_SHORT_NOW" == "true" ]]; then
             python -m core.automation --publish-short-now
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$PUBLISH_NEXT" == "true" ]]; then
+            python -m core.automation --publish-next
           elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             python -m core.automation --publish-first-now
           else
