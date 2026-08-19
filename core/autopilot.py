@@ -32,7 +32,7 @@ DEFAULT_OUTPUT_DIR = Path("storage/autopilot")
 DEFAULT_MODEL = "s2.1-pro-free"
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SHORTS_INTRO_PATH = REPO_ROOT / "storage" / "references" / "rowat-shorts-intro-v1.gif"
+SHORTS_INTRO_PATH = REPO_ROOT / "storage" / "references" / "rowat-shorts-intro-v2.mp4"
 
 
 async def async_to_thread(func, /, *args, **kwargs):

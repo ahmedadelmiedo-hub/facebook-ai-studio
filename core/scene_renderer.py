@@ -34,6 +34,18 @@ def probe_duration(path: Path) -> float:
     return float(result.stdout.strip())
 
 
+def has_audio_stream(path: Path) -> bool:
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-select_streams", "a:0",
+            "-show_entries", "stream=index", "-of", "csv=p=0", str(path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
 def load_scene_plan(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise FileNotFoundError(f"scene plan not found: {path}")
@@ -122,7 +134,7 @@ def prepend_video_intro(
     height: int = 1920,
     fps: int = 24,
 ) -> None:
-    """Prepend a silent vertical intro to a video while preserving the main audio afterward."""
+    """Prepend a vertical intro, preserving its audio when present."""
     if not video_path.is_file() or video_path.stat().st_size == 0:
         raise FileNotFoundError(f"main video not found or empty: {video_path}")
     if not intro_path.is_file() or intro_path.stat().st_size == 0:
@@ -138,55 +150,34 @@ def prepend_video_intro(
     with TemporaryDirectory(prefix="shorts-intro-") as temp_dir:
         temp_output = Path(temp_dir) / "with-intro.mp4"
         final_target = temp_output if same_path else output_path
+        intro_has_audio = has_audio_stream(intro_path)
+        intro_audio_label = "[0:a]" if intro_has_audio else "[2:a]"
         filter_graph = (
             f"[0:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p[intro_v];"
+            f"{intro_audio_label}atrim=duration={intro_duration:.3f},asetpts=PTS-STARTPTS[intro_a];"
             f"[1:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p[main_v];"
-            f"[2:a]atrim=duration={intro_duration:.3f},asetpts=PTS-STARTPTS[intro_a];"
             "[1:a]aresample=async=1:first_pts=0[main_a];"
             "[intro_v][intro_a][main_v][main_a]concat=n=2:v=1:a=1[out_v][out_a]"
         )
-        _run(
-            [
-                "ffmpeg",
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-i",
-                str(intro_path),
-                "-i",
-                str(video_path),
-                "-f",
-                "lavfi",
-                "-t",
-                f"{intro_duration:.3f}",
-                "-i",
+        command = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(intro_path), "-i", str(video_path),
+        ]
+        if not intro_has_audio:
+            command.extend([
+                "-f", "lavfi", "-t", f"{intro_duration:.3f}", "-i",
                 "anullsrc=channel_layout=stereo:sample_rate=44100",
-                "-filter_complex",
-                filter_graph,
-                "-map",
-                "[out_v]",
-                "-map",
-                "[out_a]",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-crf",
-                "22",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "160k",
-                "-movflags",
-                "+faststart",
-                str(final_target),
-            ]
-        )
+            ])
+        command.extend([
+            "-filter_complex", filter_graph,
+            "-map", "[out_v]", "-map", "[out_a]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart", str(final_target),
+        ])
+        _run(command)
         if same_path:
             temp_output.replace(output_path)
 
