@@ -46,6 +46,27 @@ def has_audio_stream(path: Path) -> bool:
     return result.returncode == 0 and bool(result.stdout.strip())
 
 
+def master_narration_audio(audio_path: Path, *, target_lufs: float = -16.0) -> None:
+    """Polish narration in place for short-form delivery without changing its content."""
+    if not audio_path.is_file() or audio_path.stat().st_size == 0:
+        raise FileNotFoundError(f"audio file not found or empty: {audio_path}")
+    mastered_path = audio_path.with_name(f"{audio_path.stem}.mastered{audio_path.suffix}")
+    _run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(audio_path),
+            "-af",
+            (
+                "highpass=f=70,lowpass=f=15000,"
+                "acompressor=threshold=-18dB:ratio=3:attack=5:release=90:makeup=2,"
+                f"loudnorm=I={target_lufs}:TP=-1.5:LRA=11"
+            ),
+            "-c:a", "libmp3lame", "-b:a", "192k", str(mastered_path),
+        ]
+    )
+    mastered_path.replace(audio_path)
+
+
 def load_scene_plan(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise FileNotFoundError(f"scene plan not found: {path}")

@@ -21,7 +21,13 @@ from core.avatar_animation import build_avatar_provider
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.character_consistency import build_scene_manifest, load_character_bible
 from core.performance_planner import split_script_into_performance_segments, write_performance_plan
-from core.scene_renderer import prepend_video_intro, probe_duration, render_avatar_episode, render_visual_video
+from core.scene_renderer import (
+    master_narration_audio,
+    prepend_video_intro,
+    probe_duration,
+    render_avatar_episode,
+    render_visual_video,
+)
 
 LOGGER = logging.getLogger("facebook_ai_studio.autopilot")
 DEFAULT_SCRIPT = """ياسر: جالي تليفون الساعة 2 وربع.. جثة في شقة مهجورة في طنطا.
@@ -449,6 +455,9 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
                     await asyncio.sleep(delay)
             chunk_paths.append(chunk_path)
         concatenate_mp3_chunks(chunk_paths, audio_path)
+        if settings.profile.name == "short":
+            master_narration_audio(audio_path, target_lufs=-16.0)
+            LOGGER.info("Short narration mastered for clarity and platform loudness")
         LOGGER.info("Audio assembled from %s Fish Audio segment(s)", len(chunk_paths))
     finally:
         for chunk_path in chunk_paths:
