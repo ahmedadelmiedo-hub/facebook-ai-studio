@@ -1,3 +1,4 @@
 # Runtime dependency for vertical video rendering.
 moviepy==1.0.3
 requests>=2.31.0
+static-ffmpeg==3.0

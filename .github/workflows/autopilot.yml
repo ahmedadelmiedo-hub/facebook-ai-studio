@@ -75,17 +75,8 @@ jobs:
           cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
-      - name: Verify media tools
-        run: |
-          command -v ffmpeg
-          command -v ffprobe
-          ffprobe -version
-          if command -v fc-match >/dev/null 2>&1; then
-            echo "Arabic caption font resolution:"
-            fc-match "Noto Sans Arabic" || fc-match "Noto Naskh Arabic" || fc-match "DejaVu Sans" || true
-          else
-            echo "fontconfig is unavailable; FFmpeg will use its configured fallback font."
-          fi
+      - name: Configure media tools
+        run: python tools/configure_media_tools.py
       - name: Run autonomous content job
         env:
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
