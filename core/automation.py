@@ -173,14 +173,15 @@ def next_pending_asset(
         raise RuntimeError("no pending asset is available")
     first = min(
         candidates,
-        key=lambda item: (
-            item.part_number,
-            0 if item.content_format == "long" else 1,
-            item.scheduled_at,
-            item.asset_id,
-        ),
+        key=lambda item: (item.scheduled_at, item.part_number, item.asset_id),
     )
-    publish_at = (now or datetime.now(UTC)).astimezone(UTC).isoformat().replace("+00:00", "Z")
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    planned = datetime.fromisoformat(first.scheduled_at.replace("Z", "+00:00"))
+    # Preserve future YouTube scheduling. Only overdue assets are made immediate,
+    # which prevents a Hook from being uploaded after its full episode.
+    if planned > current:
+        return first
+    publish_at = current.isoformat().replace("+00:00", "Z")
     return replace(first, scheduled_at=publish_at)
 
 

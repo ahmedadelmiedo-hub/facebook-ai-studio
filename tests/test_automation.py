@@ -64,8 +64,9 @@ class AutomationTests(unittest.TestCase):
                 publish_next=True,
             )
             self.assertEqual(len(result), 1)
-            self.assertEqual(result[0]["content_format"], "long")
-            self.assertTrue(result[0]["scheduled_at"].startswith("2026-08-13T12:00:00"))
+            self.assertEqual(result[0]["content_format"], "short")
+            self.assertTrue(result[0]["asset_id"].endswith("-HOOK"))
+            self.assertGreater(result[0]["scheduled_at"], "2026-08-13T12:00:00")
 
     def test_initial_launch_selects_first_long_episode_immediately(self):
         with TemporaryDirectory() as directory:

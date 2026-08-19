@@ -122,11 +122,12 @@ def _make_shorts(episode_id: str, release_at: datetime, target_words: int) -> tu
         ShortPlan(
             asset_id=f"{episode_id}-HOOK",
             kind="opening_hook",
-            scheduled_at=_iso(release_at - timedelta(hours=6)),
+            scheduled_at=_iso(release_at - timedelta(minutes=45)),
             target_seconds=45,
             source_instruction=(
                 "اكتب Hook مستقلًا من افتتاحية البارت، يكشف الخطر أو السؤال المركزي "
-                "من دون حرق الحل، وينتهي بدعوة لسماع البارت كاملًا من الـPlaylist."
+                "من دون حرق الحل، وينتهي بدعوة لسماع البارت كاملًا من الـPlaylist. "
+                "يجب أن يكون إعلانًا تمهيديًا قصيرًا قبل الحلقة الكاملة بنحو 45 دقيقة."
             ),
         ),
         ShortPlan(

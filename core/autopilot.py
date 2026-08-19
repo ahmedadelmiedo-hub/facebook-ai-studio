@@ -39,6 +39,7 @@ DEFAULT_MODEL = "s2.1-pro-free"
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SHORTS_INTRO_PATH = REPO_ROOT / "storage" / "references" / "rowat-shorts-intro-v2.mp4"
+APPROVED_MASTER_FRAME = REPO_ROOT / "storage" / "references" / "rowat-host-seated-master-v2.png"
 
 
 async def async_to_thread(func, /, *args, **kwargs):
@@ -466,25 +467,44 @@ async def synthesize_audio(settings: Settings, audio_path: Path) -> None:
 
 
 def render_video(audio_path: Path, video_path: Path, settings: Settings) -> None:
-    """Render either a landscape episode or a vertical Short with voice-over."""
+    """Render every asset with the approved seated presenter, Arabic captions, and Short intro."""
+    if not APPROVED_MASTER_FRAME.is_file() or APPROVED_MASTER_FRAME.stat().st_size == 0:
+        raise FileNotFoundError(f"approved presenter/studio frame not found or empty: {APPROVED_MASTER_FRAME}")
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+    captions_path = video_path.with_suffix(".ass")
+    duration = probe_duration(audio_path)
+    write_arabic_ass(
+        build_estimated_cues(settings.script, duration),
+        captions_path,
+        vertical=settings.profile.name == "short",
+    )
+    visual_path = video_path.with_suffix(".visual.mp4")
     try:
-        from moviepy.editor import AudioFileClip, ColorClip
-    except ImportError:
-        from moviepy import AudioFileClip, ColorClip
-    audio = AudioFileClip(str(audio_path))
-    video = ColorClip(size=settings.profile.canvas, color=settings.background, duration=audio.duration)
-    try:
-        video = video.with_audio(audio) if hasattr(video, "with_audio") else video.set_audio(audio)
-        video.write_videofile(
-            str(video_path),
-            fps=settings.fps,
-            codec="libx264",
-            audio_codec="aac",
-            logger=None,
+        width, height = settings.profile.canvas
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-loop", "1", "-i", str(APPROVED_MASTER_FRAME),
+                "-t", f"{duration:.3f}",
+                "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},format=yuv420p",
+                "-an", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                "-r", str(settings.fps), str(visual_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode:
+            raise RuntimeError(f"FFmpeg presenter render failed: {(result.stderr or result.stdout)[-4000:]}")
+        mux_audio_and_captions(
+            visual_path,
+            audio_path,
+            captions_path,
+            video_path,
+            fonts_dir=Path("/usr/share/fonts/truetype/noto"),
         )
     finally:
-        video.close()
-        audio.close()
+        visual_path.unlink(missing_ok=True)
+        captions_path.unlink(missing_ok=True)
     if settings.profile.name == "short":
         if not SHORTS_INTRO_PATH.is_file() or SHORTS_INTRO_PATH.stat().st_size == 0:
             raise FileNotFoundError(f"Shorts intro not found or empty: {SHORTS_INTRO_PATH}")
