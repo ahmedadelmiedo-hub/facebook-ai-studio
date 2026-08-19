@@ -24,6 +24,7 @@ from core.character_consistency import build_scene_manifest, load_character_bibl
 from core.performance_planner import split_script_into_performance_segments, write_performance_plan
 from core.scene_renderer import (
     master_narration_audio,
+    mux_audio_and_captions,
     prepend_video_intro,
     probe_duration,
     render_avatar_episode,
