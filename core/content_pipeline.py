@@ -1,4 +1,4 @@
-"""Select daily Rowat Alwaqe assets from a generated series plan.
+"""Select Secrets of the Wild assets from a generated wildlife documentary plan.
 
 This module stays independent from Fish Audio and YouTube. It maps story-plan metadata
 to long/short scripts and records completed assets so a daily workflow does not repeat an
@@ -71,10 +71,10 @@ def load_series_assets(content_root: Path, story_id: str) -> list[PublishableAss
                 title=episode_title,
                 description=(
                     f"{episode_title}\n\n"
-                    f"استمع إلى رواية «{series_title}» بالترتيب من خلال Playlist: {playlist_title}.\n\n"
-                    "اكتب توقعك في التعليقات، واشترك لتصلك بقية خيوط القضية."
+                    f"شاهد وثائقي «{series_title}» ضمن قائمة التشغيل: {playlist_title}.\n\n"
+                    "شاركنا أكثر معلومة أدهشتك، واشترك لمزيد من أسرار البرية."
                 ),
-                tags=("رواة الواقع", "رواية عربية", "قصة بوليسية", "غموض", "تحقيق"),
+                tags=("أسرار البرية", "الحياة البرية", "وثائقي", "حيوانات", "طبيعة"),
                 scheduled_at=str(episode["long_release_at"]),
                 playlist_title=playlist_title,
                 playlist_description=playlist_description,
@@ -93,11 +93,11 @@ def load_series_assets(content_root: Path, story_id: str) -> list[PublishableAss
                     content_format="short",
                     title=f"{series_title} | {kind.replace('_', ' ')} | البارت {part_number}",
                     description=(
-                        f"مقطع من «{series_title}» — البارت {part_number}.\n"
-                        f"اسمع الحلقة كاملة من Playlist: {playlist_title}.\n"
-                        "ما هي نظريتك؟"
+                        f"مقطع من وثائقي «{series_title}».\n"
+                        f"شاهد الحلقة كاملة من قائمة التشغيل: {playlist_title}.\n"
+                        "ما أكثر سلوك أدهشك؟"
                     ),
-                    tags=("رواة الواقع", "Shorts", "رواية عربية", "غموض", "تحقيق"),
+                    tags=("أسرار البرية", "Shorts", "الحياة البرية", "حيوانات", "طبيعة"),
                     scheduled_at=str(short["scheduled_at"]),
                     playlist_title=playlist_title,
                     playlist_description=playlist_description,
