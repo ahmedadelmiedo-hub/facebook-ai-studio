@@ -226,7 +226,7 @@ for attempt in range(1, 4):
     choice = retry_choice
     script = retry_script
     voice_match = re.search(
-        r"##\\s*النص الكامل للتعليق الصوتي\\s*(.*?)(?=\\n##\\s|\\Z)",
+        r"##\s*النص الكامل للتعليق الصوتي\s*(.*?)(?=\n##\s|\Z)",
         script,
         flags=re.DOTALL,
     )
@@ -236,7 +236,7 @@ for attempt in range(1, 4):
             "missing narration section. No output files were written."
         )
     voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
-    voice_words = re.findall(r"[^\\W_]+(?:[’'-][^\\W_]+)*", voice_text, flags=re.UNICODE)
+    voice_words = re.findall(r"[^\W_]+(?:[’'-][^\W_]+)*", voice_text, flags=re.UNICODE)
     word_count = len(voice_words)
     print(f"Expansion attempt {attempt} narration length: {word_count} words.")
 
