@@ -243,6 +243,7 @@ def run_daily(
     publish_short_now: bool = False,
     publish_long_now: bool = False,
     publish_next: bool = False,
+    approve_asset_id: str = "",
 ) -> list[dict[str, Any]]:
     """Produce and publish the assets due on the Cairo calendar date."""
     story_id = find_or_create_story_plan(
@@ -253,6 +254,30 @@ def run_daily(
     assets = load_series_assets(content_root, story_id)
     state = load_state(content_root, story_id)
     initial_launch = publish_first_now and not state.get("assets")
+    if approve_asset_id:
+        approved = [asset for asset in assets if asset.asset_id == approve_asset_id]
+        if not approved:
+            raise RuntimeError(f"approved asset ID is not part of the active wildlife plan: {approve_asset_id}")
+        if state.get("assets", {}).get(approve_asset_id, {}).get("status") in DONE_STATUSES:
+            raise RuntimeError(f"asset has already been published: {approve_asset_id}")
+        due = approved
+    elif not dry_run:
+        pending = [
+            asset for asset in assets
+            if asset.content_format == "long"
+            and state.get("assets", {}).get(asset.asset_id, {}).get("status") not in DONE_STATUSES
+        ]
+        if not pending:
+            raise RuntimeError("no pending long episode is available for review")
+        preview_asset = min(pending, key=lambda item: (item.part_number, item.scheduled_at))
+        preview_path = render_asset(preview_asset, content_root=content_root, output_root=output_root)
+        return [{
+            "status": "awaiting_review",
+            "asset_id": preview_asset.asset_id,
+            "title": preview_asset.title,
+            "video_path": str(preview_path),
+            "message": "Review this video artifact. Re-run with --approve-asset-id and this exact asset ID to upload it."
+        }]
     if publish_long_now:
         due = [first_pending_long_asset(assets, state, now=target_date)]
     elif publish_short_now:
@@ -300,6 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, default=Path(os.getenv("AUTOPILOT_OUTPUT_DIR", "storage/autopilot")))
     parser.add_argument("--date", help="Optional ISO timestamp for deterministic testing")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--approve-asset-id", default="", help="Exact reviewed asset ID approved for YouTube upload")
     parser.add_argument(
         "--publish-first-now",
         action="store_true",
@@ -336,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
             publish_short_now=args.publish_short_now,
             publish_long_now=args.publish_long_now,
             publish_next=args.publish_next,
+            approve_asset_id=args.approve_asset_id.strip(),
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}")
