@@ -29,6 +29,40 @@ if episode.get("status") != "queued":
     raise SystemExit(f"Episode {episode.get('id')} is not queued")
 
 model = "openai/gpt-oss-120b"
+
+# Verify that this exact model is active for the API key before spending a generation request.
+models_request = urllib.request.Request(
+    "https://api.groq.com/openai/v1/models",
+    headers={
+        "Authorization": "Bearer " + API_KEY,
+        "Accept": "application/json",
+        "User-Agent": "secrets-of-the-wilderness/1.2",
+    },
+    method="GET",
+)
+try:
+    with urllib.request.urlopen(models_request, timeout=45) as response:
+        available_models = json.loads(response.read().decode("utf-8"))
+except urllib.error.HTTPError as exc:
+    details = exc.read().decode("utf-8", errors="replace")
+    raise SystemExit(
+        f"Groq model preflight failed (HTTP {exc.code}); "
+        f"check that GROQ_API_KEY is valid and can list models: {details[:2000]}"
+    ) from None
+except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+    raise SystemExit(f"Could not verify Groq model availability: {exc}") from None
+
+model_entry = next(
+    (item for item in available_models.get("data", []) if item.get("id") == model),
+    None,
+)
+if model_entry is None or model_entry.get("active") is False:
+    raise SystemExit(
+        f"Required Groq model {model!r} is not active/available for this API key. "
+        "No generation request was sent. Check Groq Console model access."
+    )
+print(f"Groq model preflight passed: {model}")
+
 prompt = f'''اكتب سيناريو وثائقيًا عربيًا أصليًا لقناة {CONFIG['channel_name']}.
 الموضوع: {episode['topic']}. العنوان: {episode['title']}.
 الأسلوب: مزيج من الوثائقي المشوق والسرد القصصي، بصوت راوٍ رجالي.
@@ -49,7 +83,7 @@ request = urllib.request.Request(
         "Authorization": "Bearer " + API_KEY,
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "User-Agent": "secrets-of-the-wilderness/1.1",
+        "User-Agent": "secrets-of-the-wilderness/1.2",
     },
     method="POST",
 )
