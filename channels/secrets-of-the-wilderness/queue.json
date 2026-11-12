@@ -1,0 +1,15 @@
+{
+  "channel_name": "أسرار البرية",
+  "status": "ready_for_first_run",
+  "episodes": [
+    {
+      "id": "wilderness-001",
+      "title": "أسرار الليل في الغابة: ماذا يحدث عندما ننام؟",
+      "topic": "الكائنات الليلية وتكيفاتها وأساليب تواصلها",
+      "language": "ar",
+      "format": "long",
+      "status": "queued",
+      "shorts": 3
+    }
+  ]
+}
