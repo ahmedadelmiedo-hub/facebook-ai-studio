@@ -1,4 +1,4 @@
-"""Plan long Arabic crime-story seasons, episodes, engagement breaks, and promotional Shorts.
+"""Plan short Arabic wildlife documentary episodes and derived promotional Shorts.
 
 The planner is deterministic: the AI writer supplies an original story brief and an estimated
 story length, then this module selects the episode count, word budgets, and release grid.
@@ -12,11 +12,11 @@ from math import ceil
 from zoneinfo import ZoneInfo
 
 CAIRO_TZ = ZoneInfo("Africa/Cairo")
-NARRATION_WORDS_PER_MINUTE = 130
-MIN_EPISODES = 4
-MAX_EPISODES = 9
-MIN_STORY_WORDS = 12_000
-MAX_TARGET_WORDS_PER_EPISODE = 4_200
+NARRATION_WORDS_PER_MINUTE = 140
+MIN_EPISODES = 1
+MAX_EPISODES = 1
+MIN_STORY_WORDS = 1_000
+MAX_TARGET_WORDS_PER_EPISODE = 1_400
 
 
 @dataclass(frozen=True)
@@ -66,18 +66,14 @@ class SeriesPlan:
 
 
 def choose_episode_count(estimated_total_words: int) -> int:
-    """Select a part count that preserves long-form listening sessions."""
+    """Keep each wildlife documentary near the requested 8–9 minute duration."""
     required_parts = ceil(estimated_total_words / MAX_TARGET_WORDS_PER_EPISODE)
     return max(MIN_EPISODES, min(MAX_EPISODES, required_parts))
 
 
 def release_days_for(episode_count: int) -> tuple[int, ...]:
-    """Use a lighter cadence for short stories and a faster cadence for long arcs."""
-    if episode_count <= 5:
-        # Monday and Thursday give every episode enough room for discovery Shorts.
-        return (0, 3)
-    # Sunday, Tuesday, and Thursday keep a long investigation moving without daily uploads.
-    return (6, 1, 3)
+    """Use two weekly publishing slots for the channel pilot."""
+    return (0, 3)
 
 
 def release_day_names(weekdays: tuple[int, ...]) -> tuple[str, ...]:
@@ -86,7 +82,7 @@ def release_day_names(weekdays: tuple[int, ...]) -> tuple[str, ...]:
 
 
 def next_release_after(after: datetime, weekdays: tuple[int, ...]) -> datetime:
-    """Return the next 21:00 Cairo release slot strictly after ``after``."""
+    """Return the next 20:00 Cairo release slot strictly after ``after``."""
     local_after = after.astimezone(CAIRO_TZ)
     for day_offset in range(0, 8):
         candidate_date = (local_after + timedelta(days=day_offset)).date()
@@ -190,7 +186,7 @@ def build_series_plan(
             EpisodePlan(
                 id=episode_id,
                 part_number=index,
-                title=f"{series_title} | البارت {index} | رواية عربية مسموعة",
+                title=f"{series_title} | وثائقي حياة برية",
                 target_words=target_words,
                 target_duration_minutes=duration,
                 long_release_at=_iso(release_at),
@@ -200,7 +196,7 @@ def build_series_plan(
                     "ثم اطلب الإعجاب والاشتراك لمتابعة كشف الحقيقة."
                 ),
                 cliffhanger_goal=(
-                    "اختم بمعلومة تقلب مسار التحقيق أو تهدد بطل القصة، من دون كشف الحل النهائي."
+                    "اختم بخلاصة علمية مدهشة تفتح باب الفضول دون تضليل."
                 ),
                 shorts=_make_shorts(episode_id, release_at, target_words),
             )
@@ -215,7 +211,7 @@ def build_series_plan(
         episode_count=episode_count,
         release_days=release_day_names(weekdays),
         timezone="Africa/Cairo",
-        playlist_title=f"{series_title.strip()} | رواية كاملة",
+        playlist_title=f"{series_title.strip()} | أسرار البرية",
         playlist_description=(
             f"استمع إلى رواية «{series_title.strip()}» كاملة مرتبة بالبارتات. "
             "فعّل الاشتراك ليصلك كل كشف جديد في القضية."
