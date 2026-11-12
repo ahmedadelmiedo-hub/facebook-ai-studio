@@ -216,7 +216,7 @@ if word_count < 1300:
     choice = retry_choice
     script = retry_script
     voice_match = re.search(
-        r"##\\s*النص الكامل للتعليق الصوتي\\s*(.*?)(?=\\n##\\s|\\Z)",
+        r"##\s*النص الكامل للتعليق الصوتي\s*(.*?)(?=\n##\s|\Z)",
         script,
         flags=re.DOTALL,
     )
