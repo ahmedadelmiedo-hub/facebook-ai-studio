@@ -63,16 +63,56 @@ if model_entry is None or model_entry.get("active") is False:
     )
 print(f"Groq model preflight passed: {model}")
 
-prompt = f'''اكتب سيناريو وثائقيًا عربيًا أصليًا لقناة {CONFIG['channel_name']}.
-الموضوع: {episode['topic']}. العنوان: {episode['title']}.
-الأسلوب: مزيج من الوثائقي المشوق والسرد القصصي، بصوت راوٍ رجالي.
-اكتب افتتاحية قوية، ثم 6 إلى 8 مشاهد متسلسلة، وخاتمة. اجعل المعلومات العلمية دقيقة، ولا تختلق حقائق أو أرقامًا أو اقتباسات. ضع [بحاجة إلى تحقق] بجوار أي معلومة غير مؤكدة. أضف وصفًا بصريًا لكل مشهد، ونصوصًا قصيرة على الشاشة، وثلاث أفكار Shorts في النهاية. اللغة عربية واضحة مناسبة للتعليق الصوتي.'''
+prompt = f'''أنت كاتب ومحرر علمي لوثائقيات الحياة البرية. اكتب حلقة عربية أصلية لقناة {CONFIG['channel_name']}.
+العنوان: {episode['title']}. الموضوع: {episode['topic']}.
+الجمهور: عام عربي. الأسلوب: وثائقي مشوق ممزوج بسرد قصصي، بصوت راوٍ رجالي طبيعي.
+
+شرط الطول الإلزامي:
+- اكتب من 1300 إلى 1550 كلمة عربية منطوقة في قسم عنوانه حرفيًا: ## النص الكامل للتعليق الصوتي.
+- هذا القسم وحده يحتوي السرد الكامل مقسمًا إلى 8 مشاهد مترابطة، وليس ملخصًا أو نقاطًا.
+- لا تحتسب خطة الصورة أو المصادر أو أفكار Shorts ضمن عدد الكلمات.
+- لا تحشو ولا تكرر للوصول إلى الطول.
+
+قواعد الدقة العلمية:
+1) ممنوع اختراع أسماء أنواع أو سلوكيات أو أرقام أو اقتباسات. لا تستخدم أسماء تبدو علمية بلا مصدر.
+2) عند ذكر نوع محدد، اكتب اسمه العربي واسمه العلمي اللاتيني الصحيح. إن لم تتأكد، استخدم وصفًا عامًا ولا تخترع اسمًا.
+3) لا تعمم صفة نوع واحد على كل المجموعة. فرّق بين الليلي والشفقِي، وبين الضوء الخافت والظلام المطلق.
+4) لا تذكر أرقامًا أو نسبًا إلا بمصدر محدد. ممنوع ادعاء "مئات الروائح في الثانية".
+5) لا تصف مسارات النمل بأنها خطوط فوسفاتية مضيئة، ولا تخلط بين الصقور والحمام أو بين أنواع القرود.
+6) استخدم الحقائق المرجعية التالية بدقة:
+- الخفافيش تستخدم تحديد الموقع بالصدى؛ تصدر أصواتًا وتستقبل أصداءها لتقدير مواقع الأجسام والفرائس.
+- كثير من البوم يصطاد ليلًا ويعتمد على السمع والرؤية في الضوء الخافت. ريش بعض الأنواع يقلل صوت الطيران. لا تقل إنها ترى في ظلام مطلق.
+- آي آي (Daubentonia madagascariensis) ليمور ليلي؛ تذكر National Geographic أنه الرئيسيات المعروف الوحيد الذي يستخدم تحديد الموقع بالصدى للعثور على الفرائس. انسب المعلومة للمصدر ولا توسعها.
+- التارسير له عيون كبيرة جدًا نسبةً إلى حجم الجسم وفق متحف التاريخ الطبيعي البريطاني.
+- ثعلب الفنك (Vulpes zerda) متكيف مع النشاط الليلي في الصحراء، وأذناه تساعدانه على التقاط الأصوات وتبديد الحرارة؛ لا تقدمه كحيوان غابة.
+- تنشط حيوانات ليلًا لأسباب مختلفة، منها تجنب حرارة النهار أو البحث عن الغذاء أو التزاوج أو تفادي المفترسات؛ لا تجعل سببًا واحدًا قاعدة عامة.
+7) ميّز بين الحقيقة الموثقة والتشبيه الأدبي.
+8) أدرج 5 إلى 6 مصادر من القائمة التالية فقط، مع رابط كامل ومعلومة يسندها. لا تخترع مراجع أو روابط:
+- National Geographic, Nocturnal animals, explained: https://www.nationalgeographic.com/animals/article/nocturnal-animals-explained
+- National Geographic, How Echolocation Lets Animals—and Some Humans—Navigate by Sound: https://www.nationalgeographic.com/animals/article/echolocation-is-nature-built-in-sonar-here-is-how-it-works
+- National Geographic, Owls, facts and information: https://www.nationalgeographic.com/animals/birds/facts/owls
+- Natural History Museum, Superior senses in the dark: https://www.nhm.ac.uk/discover/superior-senses-in-the-dark.html
+- Oxford Academic, Evolution and Ecology of Silent Flight in Owls and Other Flying Vertebrates: https://academic.oup.com/iob/article/2/1/obaa001/5709817
+- U.S. National Park Service, Animals Need the Dark: https://www.nps.gov/articles/nocturnal_earthnight.htm
+
+بنية المخرجات:
+## النص الكامل للتعليق الصوتي
+ثمانية مشاهد كاملة، 1300-1550 كلمة منطوقة، افتتاحية قوية وخاتمة مؤثرة.
+## خطة المشاهد والصورة
+وصف بصري قابل للتنفيذ ونص قصير على الشاشة لكل مشهد.
+## أفكار Shorts
+ثلاث أفكار مشتقة من الحلقة.
+## المصادر العلمية
+المصدر والرابط والمعلومة التي يسندها.
+## ملاحظات المراجعة
+أي معلومة تحتاج تحققًا، مع التأكيد أن النص غير معتمد للنشر تلقائيًا.
+'''
 
 payload = json.dumps({
     "model": model,
     "messages": [{"role": "user", "content": prompt}],
-    "temperature": 0.6,
-    "max_completion_tokens": 12000,
+    "temperature": 0.3,
+    "max_completion_tokens": 16000,
     "reasoning_effort": "low",
     "include_reasoning": False,
 }, ensure_ascii=False).encode("utf-8")
@@ -109,6 +149,42 @@ except (KeyError, IndexError, TypeError):
 if not script:
     raise SystemExit("Groq returned an empty script; no output files were written")
 
+import re
+
+voice_match = re.search(
+    r"##\\s*النص الكامل للتعليق الصوتي\\s*(.*?)(?=\\n##\\s|\\Z)",
+    script,
+    flags=re.DOTALL,
+)
+if not voice_match:
+    raise SystemExit("Quality gate failed: missing full narration section. No output files were written.")
+
+voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
+voice_words = re.findall(r"[^\\W_]+(?:[’'-][^\\W_]+)*", voice_text, flags=re.UNICODE)
+word_count = len(voice_words)
+if word_count < 1300 or word_count > 1700:
+    raise SystemExit(
+        f"Quality gate failed: narration has {word_count} words; expected 1300-1700. "
+        "No output files were written."
+    )
+
+required_sections = [
+    "## خطة المشاهد والصورة",
+    "## أفكار Shorts",
+    "## المصادر العلمية",
+    "## ملاحظات المراجعة",
+]
+missing_sections = [heading for heading in required_sections if heading not in script]
+if missing_sections:
+    raise SystemExit("Quality gate failed: missing sections: " + ", ".join(missing_sections))
+
+source_section = script.split("## المصادر العلمية", 1)[1].split("## ملاحظات المراجعة", 1)[0]
+source_urls = re.findall(r"https?://[^\\s)]+", source_section)
+if len(source_urls) < 4:
+    raise SystemExit(f"Quality gate failed: only {len(source_urls)} source links found; minimum is 4.")
+
+print(f"Quality gate passed: {word_count} narration words and {len(source_urls)} source links.")
+
 safe_id = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in episode["id"])
 out = ROOT / "output"
 out.mkdir(exist_ok=True)
@@ -129,6 +205,9 @@ metadata = {
     "usage": data.get("usage"),
     "generated_at_utc": datetime.now(timezone.utc).isoformat(),
     "review_required": True,
+    "narration_word_count": word_count,
+    "source_link_count": len(source_urls),
+    "quality_gate": "passed",
 }
 metadata_path.write_text(
     json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
