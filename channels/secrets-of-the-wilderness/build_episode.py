@@ -162,6 +162,71 @@ if not voice_match:
 voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
 voice_words = re.findall(r"[^\W_]+(?:[’'-][^\W_]+)*", voice_text, flags=re.UNICODE)
 word_count = len(voice_words)
+
+if word_count < 1300:
+    print(
+        f"Initial narration is too short ({word_count} words); "
+        "requesting one expansion attempt before failing."
+    )
+    repair_prompt = (
+        prompt
+        + "\\n\\nالمحاولة السابقة كانت أقصر من المطلوب. أعد كتابة الحزمة كاملة من البداية، "
+        + "ولا تختصر. اكتب 8 مشاهد، واجعل كل مشهد في قسم التعليق الصوتي نحو 165-190 كلمة "
+        + "حتى يصل مجموع السرد وحده إلى 1300-1550 كلمة. لا تغيّر قواعد الدقة أو المصادر. "
+        + "أخرج الأقسام الخمسة المطلوبة كاملة."
+        + "\\n\\nالنص السابق الذي لم يحقق الطول:\\n"
+        + script
+    )
+    retry_payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": repair_prompt}],
+        "temperature": 0.25,
+        "max_completion_tokens": 16000,
+        "reasoning_effort": "low",
+        "include_reasoning": False,
+    }, ensure_ascii=False).encode("utf-8")
+    retry_request = urllib.request.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=retry_payload,
+        headers={
+            "Authorization": "Bearer " + API_KEY,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "secrets-of-the-wilderness/1.3",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(retry_request, timeout=300) as response:
+            retry_data = json.loads(response.read().decode("utf-8"))
+        retry_choice = retry_data["choices"][0]
+        retry_script = (retry_choice["message"].get("content") or "").strip()
+    except urllib.error.HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(
+            f"Groq expansion retry failed (HTTP {exc.code}): {details[:3000]}"
+        ) from None
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+        raise SystemExit(f"Groq expansion retry failed: {exc}") from None
+
+    if not retry_script:
+        raise SystemExit("Groq expansion retry returned empty content; no output files were written")
+
+    data = retry_data
+    choice = retry_choice
+    script = retry_script
+    voice_match = re.search(
+        r"##\\s*النص الكامل للتعليق الصوتي\\s*(.*?)(?=\\n##\\s|\\Z)",
+        script,
+        flags=re.DOTALL,
+    )
+    if not voice_match:
+        raise SystemExit("Quality gate failed after expansion retry: missing narration section.")
+    voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
+    voice_words = re.findall(r"[^\\W_]+(?:[’'-][^\\W_]+)*", voice_text, flags=re.UNICODE)
+    word_count = len(voice_words)
+    print(f"Expanded narration length: {word_count} words.")
+
 if word_count < 1300 or word_count > 1700:
     raise SystemExit(
         f"Quality gate failed: narration has {word_count} words; expected 1300-1700. "
