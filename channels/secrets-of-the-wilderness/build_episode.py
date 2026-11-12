@@ -73,7 +73,8 @@ payload = json.dumps({
     "messages": [{"role": "user", "content": prompt}],
     "temperature": 0.6,
     "max_completion_tokens": 12000,
-    "reasoning_effort": "medium",
+    "reasoning_effort": "low",
+    "include_reasoning": False,
 }, ensure_ascii=False).encode("utf-8")
 
 request = urllib.request.Request(
