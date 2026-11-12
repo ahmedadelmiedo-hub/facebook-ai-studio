@@ -152,7 +152,7 @@ if not script:
 import re
 
 voice_match = re.search(
-    r"##\\s*النص الكامل للتعليق الصوتي\\s*(.*?)(?=\\n##\\s|\\Z)",
+    r"##\s*النص الكامل للتعليق الصوتي\s*(.*?)(?=\n##\s|\Z)",
     script,
     flags=re.DOTALL,
 )
@@ -160,7 +160,7 @@ if not voice_match:
     raise SystemExit("Quality gate failed: missing full narration section. No output files were written.")
 
 voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
-voice_words = re.findall(r"[^\\W_]+(?:[’'-][^\\W_]+)*", voice_text, flags=re.UNICODE)
+voice_words = re.findall(r"[^\W_]+(?:[’'-][^\W_]+)*", voice_text, flags=re.UNICODE)
 word_count = len(voice_words)
 if word_count < 1300 or word_count > 1700:
     raise SystemExit(
@@ -179,7 +179,7 @@ if missing_sections:
     raise SystemExit("Quality gate failed: missing sections: " + ", ".join(missing_sections))
 
 source_section = script.split("## المصادر العلمية", 1)[1].split("## ملاحظات المراجعة", 1)[0]
-source_urls = re.findall(r"https?://[^\\s)]+", source_section)
+source_urls = re.findall(r"https?://[^\s)]+", source_section)
 if len(source_urls) < 4:
     raise SystemExit(f"Quality gate failed: only {len(source_urls)} source links found; minimum is 4.")
 
