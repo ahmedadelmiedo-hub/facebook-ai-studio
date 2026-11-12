@@ -1,4 +1,4 @@
-"""Write original, long Arabic investigative-fiction series for Rowat Alwaqe.
+"""Write Arabic wildlife documentary scripts for Secrets of the Wild.
 
 The module deliberately separates narrative planning from media generation. It asks an
 OpenAI-compatible text model for an original story bible, turns the bible into a
@@ -141,7 +141,7 @@ def build_blueprint_prompt(*, story_id: str, requested_theme: str, language: str
 {{
   "series_title": "عنوان جذاب",
   "language": "العربية الفصحى المبسطة",
-  "estimated_total_words": 12000,
+  "estimated_total_words": 1200,
   "logline": "ملخص جذاب",
   "setting": "الموطن والبيئة",
   "protagonist": "الحيوان وخصائصه",
@@ -166,8 +166,8 @@ def validate_blueprint(data: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise RuntimeError(f"blueprint is missing {key}")
     words = data.get("estimated_total_words")
-    if not isinstance(words, int) or not 8_000 <= words <= 36_000:
-        raise RuntimeError("blueprint estimated_total_words must be between 8000 and 36000")
+    if not isinstance(words, int) or not 1_000 <= words <= 36_000:
+        raise RuntimeError("blueprint estimated_total_words must be between 1000 and 36000")
     for key in ("animals", "habitats", "adaptations", "threats", "evidence_ladder"):
         if not isinstance(data.get(key), list) or len(data[key]) < 1:
             raise RuntimeError(f"blueprint must include at least one value for {key}")
@@ -181,7 +181,7 @@ def dry_run_blueprint(story_id: str, language: str) -> dict[str, Any]:
     return {
         "series_title": "الأخطبوط: عبقري الهروب",
         "language": language if language and language != "auto" else "العربية الفصحى المبسطة",
-        "estimated_total_words": 8_000,
+        "estimated_total_words": 1_200,
         "logline": "رحلة تكشف كيف يستخدم الأخطبوط جسده وذكاءه لاستكشاف العالم والنجاة.",
         "setting": "الشعاب المرجانية والقيعان الساحلية",
         "protagonist": "الأخطبوط الشائع وقدراته العصبية والحسية",
@@ -333,7 +333,7 @@ def build_series(
     language: str,
     start_after: datetime | None = None,
 ) -> SeriesPlan:
-    """Create all scripts and supporting metadata for one original story series."""
+    """Create scripts and supporting metadata for one wildlife documentary episode."""
     story_id = sanitize_story_id(story_id)
     blueprint = dry_run_blueprint(story_id, language) if settings.dry_run else validate_blueprint(
         parse_json_response(request_chat(settings, build_blueprint_prompt(
