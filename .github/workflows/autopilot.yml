@@ -8,11 +8,6 @@ on:
         required: true
         default: false
         type: boolean
-      publish_short_now:
-        description: "نشر أقرب Short ترويجي مستحق فقط بدون إعادة رفع الحلقة الطويلة"
-        required: true
-        default: false
-        type: boolean
       approve_asset_id:
         description: "اكتب Asset ID الذي راجعته ووافقت صراحة على نشره؛ اتركه فارغًا لإنشاء معاينة فقط"
         required: false
@@ -54,7 +49,7 @@ jobs:
       FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
       FISH_VOICE_ID: ${{ secrets.FISH_VOICE_ID }}
       FISH_MODEL: s2.1-pro-free
-      SCRIPTWRITER_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      SCRIPTWRITER_API_KEY: ${{ secrets.SCRIPTWRITER_API_KEY }}
       SCRIPTWRITER_BASE_URL: https://api.groq.com/openai/v1
       SCRIPTWRITER_MODEL: openai/gpt-oss-120b
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -63,7 +58,6 @@ jobs:
       YOUTUBE_DEFAULT_LANGUAGE: ar
       YOUTUBE_CATEGORY_ID: "22"
       YOUTUBE_NOTIFY_SUBSCRIBERS: "true"
-      PUBLISH_SHORT_NOW: ${{ inputs.publish_short_now }}
       APPROVE_ASSET_ID: ${{ inputs.approve_asset_id }}
     steps:
       - name: Checkout
