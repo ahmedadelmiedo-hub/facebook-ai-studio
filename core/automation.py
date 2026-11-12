@@ -49,9 +49,10 @@ def story_is_complete(content_root: Path, story_id: str) -> bool:
         return False
     assets = load_series_assets(content_root, story_id)
     state = load_state(content_root, story_id)
-    return bool(assets) and all(
+    long_assets = [asset for asset in assets if asset.content_format == "long"]
+    return bool(long_assets) and all(
         state.get("assets", {}).get(asset.asset_id, {}).get("status") in DONE_STATUSES
-        for asset in assets
+        for asset in long_assets
     )
 
 
