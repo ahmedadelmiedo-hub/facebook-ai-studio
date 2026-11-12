@@ -1,10 +1,6 @@
-name: رواة الواقع - الإنتاج والنشر التلقائي
+name: أسرار البرية - إنتاج بمراجعة بشرية
 
 on:
-  schedule:
-    # Four Cairo-day slots; each run publishes one next pending asset.
-    # GitHub cron is UTC; these are 00:00, 06:00, 12:00, and 18:00 UTC.
-    - cron: "0 0,6,12,18 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -17,22 +13,21 @@ on:
         required: true
         default: false
         type: boolean
-      publish_next:
-        description: "اختبار الأصل التالي حسب الخطة مع احترام موعد YouTube المجدول"
-        required: true
-        default: false
-        type: boolean
+      approve_asset_id:
+        description: "اكتب Asset ID الذي راجعته ووافقت صراحة على نشره؛ اتركه فارغًا لإنشاء معاينة فقط"
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: rowat-alwaqe-autonomous-production
+  group: secrets-of-wildlife-reviewed-production
   cancel-in-progress: false
 
 jobs:
   validate:
-    name: Validate autonomous pipeline
+    name: Validate wildlife documentary pipeline
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -50,7 +45,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   produce-and-publish:
-    name: Write, render, schedule, and publish due assets
+    name: Prepare preview or publish an explicitly approved asset
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -69,7 +64,7 @@ jobs:
       YOUTUBE_CATEGORY_ID: "22"
       YOUTUBE_NOTIFY_SUBSCRIBERS: "true"
       PUBLISH_SHORT_NOW: ${{ inputs.publish_short_now }}
-      PUBLISH_NEXT: ${{ inputs.publish_next }}
+      APPROVE_ASSET_ID: ${{ inputs.approve_asset_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,14 +84,10 @@ jobs:
         run: |
           if [[ "$DRY_RUN_INPUT" == "true" ]]; then
             python -m core.automation --dry-run
-          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$PUBLISH_SHORT_NOW" == "true" ]]; then
-            python -m core.automation --publish-short-now
-          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$PUBLISH_NEXT" == "true" ]]; then
-            python -m core.automation --publish-next
-          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            python -m core.automation --publish-first-now
+          elif [[ -n "$APPROVE_ASSET_ID" ]]; then
+            python -m core.automation --approve-asset-id "$APPROVE_ASSET_ID"
           else
-            python -m core.automation --publish-next
+            python -m core.automation
           fi
       - name: Persist generated scripts and publication state
         run: |
@@ -112,7 +103,7 @@ jobs:
       - name: Upload production artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rowat-alwaqe-run-${{ github.run_number }}
+          name: secrets-of-wildlife-run-${{ github.run_number }}
           path: |
             storage/autopilot/
             content/production/
