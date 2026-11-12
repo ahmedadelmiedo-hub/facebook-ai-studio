@@ -163,25 +163,32 @@ voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
 voice_words = re.findall(r"[^\W_]+(?:[’'-][^\W_]+)*", voice_text, flags=re.UNICODE)
 word_count = len(voice_words)
 
-if word_count < 1300:
+# Retry expansion more than once. The first attempt returned 848 words,
+# so a single retry is not sufficient for the required 1300-1700-word narration.
+for attempt in range(1, 4):
+    if 1300 <= word_count <= 1700:
+        break
     print(
-        f"Initial narration is too short ({word_count} words); "
-        "requesting one expansion attempt before failing."
+        f"Narration length is {word_count} words; "
+        f"requesting expansion attempt {attempt}/3."
     )
     repair_prompt = (
         prompt
-        + "\n\nالمحاولة السابقة كانت أقصر من المطلوب. أعد كتابة الحزمة كاملة من البداية، "
-        + "ولا تختصر. اكتب 8 مشاهد، واجعل كل مشهد في قسم التعليق الصوتي نحو 165-190 كلمة "
-        + "حتى يصل مجموع السرد وحده إلى 1300-1550 كلمة. لا تغيّر قواعد الدقة أو المصادر. "
-        + "أخرج الأقسام الخمسة المطلوبة كاملة."
-        + "\n\nالنص السابق الذي لم يحقق الطول:\n"
+        + "\n\nمهم جدًا: النص السابق لم يحقق شرط الطول. وسّع النص السابق نفسه توسعة حقيقية "
+        + "ولا تلخصه أو تعِد إنتاج نسخة أقصر. المطلوب أن يصبح قسم التعليق الصوتي وحده "
+        + "بين 1400 و1550 كلمة عربية منطوقة. حافظ على المشاهد الثمانية، واجعل كل مشهد "
+        + "مفصلًا بما يكفي (نحو 175-190 كلمة). أضف شرحًا علميًا وسردًا ومواقف وصفية "
+        + "مفيدة دون تكرار أو حشو، ولا تغيّر الحقائق أو المصادر. أخرج الحزمة كاملة "
+        + "بكل العناوين الخمسة المطلوبة، وليس التعليق الصوتي وحده."
+        + f"\n\nعدد كلمات المحاولة السابقة وفق الفاحص: {word_count}."
+        + "\n\nالنص السابق المطلوب توسيعه:\n"
         + script
     )
     retry_payload = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": repair_prompt}],
-        "temperature": 0.25,
-        "max_completion_tokens": 16000,
+        "temperature": 0.35,
+        "max_completion_tokens": 20000,
         "reasoning_effort": "low",
         "include_reasoning": False,
     }, ensure_ascii=False).encode("utf-8")
@@ -192,7 +199,7 @@ if word_count < 1300:
             "Authorization": "Bearer " + API_KEY,
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "secrets-of-the-wilderness/1.3",
+            "User-Agent": "secrets-of-the-wilderness/1.4",
         },
         method="POST",
     )
@@ -204,33 +211,39 @@ if word_count < 1300:
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
         raise SystemExit(
-            f"Groq expansion retry failed (HTTP {exc.code}): {details[:3000]}"
+            f"Groq expansion attempt {attempt} failed (HTTP {exc.code}): {details[:3000]}"
         ) from None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
-        raise SystemExit(f"Groq expansion retry failed: {exc}") from None
+        raise SystemExit(f"Groq expansion attempt {attempt} failed: {exc}") from None
 
     if not retry_script:
-        raise SystemExit("Groq expansion retry returned empty content; no output files were written")
+        raise SystemExit(
+            f"Groq expansion attempt {attempt} returned empty content; "
+            "no output files were written."
+        )
 
     data = retry_data
     choice = retry_choice
     script = retry_script
     voice_match = re.search(
-        r"##\s*النص الكامل للتعليق الصوتي\s*(.*?)(?=\n##\s|\Z)",
+        r"##\\s*النص الكامل للتعليق الصوتي\\s*(.*?)(?=\\n##\\s|\\Z)",
         script,
         flags=re.DOTALL,
     )
     if not voice_match:
-        raise SystemExit("Quality gate failed after expansion retry: missing narration section.")
+        raise SystemExit(
+            f"Quality gate failed after expansion attempt {attempt}: "
+            "missing narration section. No output files were written."
+        )
     voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
-    voice_words = re.findall(r"\w+", voice_text, flags=re.UNICODE)
+    voice_words = re.findall(r"[^\\W_]+(?:[’'-][^\\W_]+)*", voice_text, flags=re.UNICODE)
     word_count = len(voice_words)
-    print(f"Expanded narration length: {word_count} words.")
+    print(f"Expansion attempt {attempt} narration length: {word_count} words.")
 
 if word_count < 1300 or word_count > 1700:
     raise SystemExit(
-        f"Quality gate failed: narration has {word_count} words; expected 1300-1700. "
-        "No output files were written."
+        f"Quality gate failed after 3 expansion attempts: narration has {word_count} words; "
+        "expected 1300-1700. No output files were written."
     )
 
 required_sections = [
