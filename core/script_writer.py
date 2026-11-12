@@ -127,95 +127,85 @@ def request_chat(settings: WriterSettings, messages: list[dict[str, str]], *, ma
 
 
 def build_blueprint_prompt(*, story_id: str, requested_theme: str, language: str) -> list[dict[str, str]]:
-    """Build the prompt that establishes an original fictional series before writing it."""
-    system = """أنت كاتب روايات عربي محترف لقناة يوتيوب اسمها «رواة الواقع».
-اكتب قصصًا خيالية أصلية فقط في التحقيق البوليسي والغموض والجريمة والاستخبارات.
-لا تقلّد أسلوب أي كاتب أو راوٍ أو قناة معروفة، ولا تنقل من قصة قائمة أو قضية حقيقية، ولا تستخدم أسماء أشخاص حقيقيين. لا تشرح أو تصف كيفية تنفيذ جريمة أو إخفاء آثارها. ابتعد عن العنف الدموي الصريح.
-القصص موجهة للقراءة الصوتية: راوٍ مباشر، مشاهد إنسانية، أدلة متدرجة، حوار قصير طبيعي، إيقاع متصاعد، وكل جزء ينتهي بانعطافة لا تكشف الحل.
-أعد JSON فقط وبالمفاتيح المطلوبة دون Markdown."""
-    user = f"""أنشئ مخططًا أصليًا لسلسلة تحقيق طويلة.
-معرّف السلسلة: {story_id}
-الفكرة الأولية: {requested_theme or 'قضية غامضة في مدينة مصرية معاصرة'}
-تفضيل اللغة: {language or 'اختر بين الفصحى المعاصرة والعامية المصرية المفهومة حسب القصة'}
+    """Build a fact-aware wildlife documentary episode blueprint."""
+    system = """أنت منتج وكاتب وثائقيات حياة برية لقناة يوتيوب «أسرار البرية».
+اكتب محتوى وثائقيًا عربيًا أصليًا عن الحيوانات وسلوكها وبيئاتها وتكيفاتها. افصل بوضوح بين الحقائق العلمية الراسخة والفرضيات، ولا تختلق أرقامًا أو وقائع أو اقتباسات. لا تقدّم الحيوان كأنه يفكر أو يتكلم كإنسان. تجنب مشاهد إيذاء الحيوانات أو تشجيع الاقتراب من الحيوانات الخطرة. أعد JSON فقط."""
+    user = f"""أنشئ مخططًا لحلقة وثائقية عن الحياة البرية.
+معرّف الحلقة: {story_id}
+الموضوع: {requested_theme or 'الأخطبوط وذكاؤه وقدرته على الهروب'}
+اللغة: {language or 'العربية الفصحى المبسطة'}
+الأسلوب: وثائقي هجين، مشاهد سينمائية مع شرح علمي واضح.
+المدة المستهدفة للحلقة الأولى: 8 إلى 9 دقائق.
 
-أعد JSON يطابق هذا الشكل:
+أعد JSON بالمفاتيح:
 {{
-  "series_title": "عنوان قصير وجذاب",
-  "language": "الفصحى المعاصرة أو العامية المصرية المبسطة",
-  "estimated_total_words": 16000,
-  "logline": "جملة واحدة",
-  "setting": "المكان والزمن",
-  "protagonist": "وصف الراوي/المحقق",
-  "core_mystery": "السؤال المحرك للقصة",
-  "stakes": "ما الذي سيخسره البطل",
-  "suspects": ["مشتبه به 1", "مشتبه به 2", "مشتبه به 3"],
-  "evidence_ladder": ["دليل 1", "دليل 2", "دليل 3", "دليل 4", "دليل 5"],
-  "final_reveal": "حل أصلي عادل لا يظهر قبل الجزء الأخير",
-  "tone": "وصف الإيقاع",
-  "content_warning": "تنبيه قصير إن لزم أو سلسلة فارغة"
+  "series_title": "عنوان جذاب",
+  "language": "العربية الفصحى المبسطة",
+  "estimated_total_words": 12000,
+  "logline": "ملخص جذاب",
+  "setting": "الموطن والبيئة",
+  "protagonist": "الحيوان وخصائصه",
+  "core_mystery": "السؤال العلمي الذي تجيب عنه الحلقة",
+  "stakes": "أهمية السلوك أو التكيف للبقاء",
+  "animals": ["النوع أو الأنواع المحورية"],
+  "habitats": ["الموائل ذات الصلة"],
+  "adaptations": ["تكيف أو سلوك موثق 1", "تكيف 2", "تكيف 3"],
+  "threats": ["تهديد بيئي موثق 1", "تهديد 2", "تهديد 3"],
+  "evidence_ladder": ["حقيقة علمية 1", "حقيقة 2", "حقيقة 3"],
+  "final_reveal": "الخلاصة العلمية",
+  "tone": "وثائقي مشوق ودقيق",
+  "content_warning": ""
 }}
-
-يجب أن تكون estimated_total_words بين 12000 و36000، مع مساحة كافية لحلقات طويلة لا لقصص قصيرة."""
+لا تستخدم قصة تحقيق أو مشتبهين أو جريمة خيالية. لا تذكر مصادر علمية غير متأكد من وجودها."""
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-
 def validate_blueprint(data: dict[str, Any]) -> dict[str, Any]:
-    """Validate provider output before it becomes a production plan."""
-    required_strings = (
-        "series_title",
-        "language",
-        "logline",
-        "setting",
-        "protagonist",
-        "core_mystery",
-        "stakes",
-        "final_reveal",
-        "tone",
-    )
+    """Validate a wildlife documentary blueprint before production."""
+    required_strings = ("series_title", "language", "logline", "setting", "protagonist", "core_mystery", "stakes", "final_reveal", "tone")
     for key in required_strings:
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise RuntimeError(f"blueprint is missing {key}")
     words = data.get("estimated_total_words")
-    if not isinstance(words, int) or not 12_000 <= words <= 36_000:
-        raise RuntimeError("blueprint estimated_total_words must be between 12000 and 36000")
-    for key in ("suspects", "evidence_ladder"):
-        if not isinstance(data.get(key), list) or len(data[key]) < 3:
-            raise RuntimeError(f"blueprint must include at least three values for {key}")
+    if not isinstance(words, int) or not 8_000 <= words <= 36_000:
+        raise RuntimeError("blueprint estimated_total_words must be between 8000 and 36000")
+    for key in ("animals", "habitats", "adaptations", "threats", "evidence_ladder"):
+        if not isinstance(data.get(key), list) or len(data[key]) < 1:
+            raise RuntimeError(f"blueprint must include at least one value for {key}")
     warning = data.get("content_warning", "")
     if not isinstance(warning, (str, list)):
         raise RuntimeError("blueprint content_warning has an unsupported type")
     return data
 
-
 def dry_run_blueprint(story_id: str, language: str) -> dict[str, Any]:
-    """Provide deterministic content for offline validation without claiming it is a final script."""
+    """Offline wildlife placeholder used only to validate planning and paths."""
     return {
-        "series_title": "ملف الرصد 17",
-        "language": language if language and language != "auto" else "العامية المصرية المبسطة",
-        "estimated_total_words": 16_000,
-        "logline": "محقق سابق يتلقى تسجيلاً صوتيًا يكشف أن قضية أغلقها منذ سنوات لم تكن كما ظن.",
-        "setting": "القاهرة المعاصرة بين حي قديم ومقر أرشيف مهمل",
-        "protagonist": "آدم، محقق سابق يعاني من أثر قرار قديم",
-        "core_mystery": "من أرسل التسجيل، ولماذا عاد رقم القضية بعد سبع سنوات؟",
-        "stakes": "إذا أخطأ آدم مرة أخرى سيتهم شخص بريء وتضيع فرصة إنصاف الضحية.",
-        "suspects": ["زميل قديم", "صحفية أرشيف", "شاهد اختفى"],
-        "evidence_ladder": ["تسجيل مجهول", "تاريخ مزور", "كاميرا معطلة", "دفتر مفقود", "اسم داخل الأرشيف"],
-        "final_reveal": "الحل يكشف دافعًا إنسانيًا معقدًا ويعالج كل الأدلة السابقة بعدل.",
-        "tone": "هادئ ومريب ثم متسارع مع نهاية كل بارت",
+        "series_title": "الأخطبوط: عبقري الهروب",
+        "language": language if language and language != "auto" else "العربية الفصحى المبسطة",
+        "estimated_total_words": 8_000,
+        "logline": "رحلة تكشف كيف يستخدم الأخطبوط جسده وذكاءه لاستكشاف العالم والنجاة.",
+        "setting": "الشعاب المرجانية والقيعان الساحلية",
+        "protagonist": "الأخطبوط الشائع وقدراته العصبية والحسية",
+        "core_mystery": "كيف يمر الأخطبوط من فتحات ضيقة ويحل مشكلات معقدة؟",
+        "stakes": "التخفي والهروب والبحث عن الغذاء وتجنب المفترسات",
+        "animals": ["الأخطبوط الشائع"],
+        "habitats": ["الشعاب المرجانية", "الشقوق الصخرية"],
+        "adaptations": ["جسم مرن بلا هيكل عظمي صلب", "أذرع مزودة بممصات", "تمويه وتغيير لون وملمس الجلد"],
+        "threats": ["تدهور الموائل البحرية", "الصيد العرضي", "التلوث البحري"],
+        "evidence_ladder": ["مرونة الجسم", "التعلم وحل المشكلات", "التمويه والسلوك الدفاعي"],
+        "final_reveal": "قوة الأخطبوط ناتجة عن اجتماع المرونة والحواس والتعلم والسلوك المرن.",
+        "tone": "وثائقي سينمائي مشوق ودقيق",
         "content_warning": "",
     }
 
-
 def chapter_role(part_number: int, episode_count: int) -> str:
-    """Describe the narrative work required of each chapter."""
+    """Describe the educational arc of a wildlife documentary episode."""
     if part_number == 1:
-        return "الافتتاح: جريمة أو دليل صادم، تعريف البطل، وسؤال مركزي قوي من أول دقيقة."
+        return "افتتاح بصري قوي، تقديم الحيوان وموطنه، وطرح السؤال العلمي الرئيسي."
     if part_number == episode_count:
-        return "الختام: ربط جميع الأدلة وكشف الحقيقة بعدل، مع خاتمة عاطفية مكتملة ودعوة لمشاركة الانطباع."
+        return "الخلاصة: جمع الحقائق، توضيح أهمية السلوك للحياة البرية، وخاتمة مؤثرة."
     if part_number == episode_count - 1:
-        return "ما قبل الحل: انهيار النظرية السائدة وظهور دليل يقلب معنى كل ما سبق."
-    return "التصعيد: كشف دليل جديد، توسيع دائرة الشك، وإجبار البطل على دفع ثمن شخصي قبل Cliffhanger."
-
+        return "كشف أعمق للتكيفات والتحديات البيئية مع تصحيح المفاهيم الشائعة."
+    return "التعمق في السلوك والقدرات والتكيفات مع أمثلة موثقة وانتقالات سينمائية."
 
 def build_episode_prompt(
     *,
@@ -225,13 +215,13 @@ def build_episode_prompt(
     previous_tail: str,
 ) -> list[dict[str, str]]:
     """Ask for spoken Arabic narration for exactly one long part."""
-    system = """أنت تكتب نصًا صوتيًا طويلًا أصليًا لرواية تحقيق عربية خيالية.
+    system = """أنت تكتب نصًا صوتيًا لوثائقي عربي عن الحياة البرية لقناة «أسرار البرية».
 أعد النص الذي سيقرأه راوي واحد بصوته مباشرة، بلا عناوين، بلا Markdown، وبلا أي ملاحظات للمخرج أو للممثل. اجعل السرد متصلًا وسهل النطق باللهجة/الفصحى المطلوبة. استخدم فقرات قصيرة وحوارًا محدودًا بصيغة الراوي مثل: «قال لي...» بدلاً من تغيير صوت المتحدثين.
-لا تذكر أن النص مولد أو أنك ذكاء اصطناعي. لا تقلّد أسلوب أي شخص أو قناة. لا تحوّل الجريمة إلى تعليمات عملية ولا تتضمن عنفًا دمويًا تفصيليًا. لا تكشف حل القضية قبل موعده.
-يجب أن تحتوي الحلقة على فاصل تفاعل واحد فقط، مدمج طبيعيًا داخل السرد، يدعو المشاهد أن يكتب توقعه حول دليل أو مشتبه به، ويطلب الإعجاب والاشتراك لاستكمال التحقيق. لا تستخدم عبارة «فاصل إعلاني» ولا تكسر الجو."""
+لا تذكر أن النص مولد أو أنك ذكاء اصطناعي. لا تقلّد أسلوب أي شخص أو قناة. لا تحوّل الجريمة إلى تعليمات عملية ولا تتضمن عنفًا دمويًا تفصيليًا. لا تخترع سلوكًا أو معلومة علمية، وميّز بين المعلومة المؤكدة والتفسير المحتمل.
+يجب أن تحتوي الحلقة على فاصل تفاعل واحد فقط، مدمج طبيعيًا داخل السرد، يدعو المشاهد لمشاركة أكثر سلوك أدهشه، ويطلب الإعجاب والاشتراك لمشاهدة وثائقيات أخرى. لا تستخدم عبارة «فاصل إعلاني» ولا تكسر الجو."""
     bible = json.dumps(blueprint, ensure_ascii=False)
     previous_context = previous_tail or "هذه هي الحلقة الأولى ولا يوجد سياق سابق."
-    user = f"""اكتب البارت {episode.part_number} من {plan.episode_count} لرواية «{plan.series_title}».
+    user = f"""اكتب الجزء {episode.part_number} من {plan.episode_count} للوثائقي «{plan.series_title}».
 اللغة: {plan.language}
 عدد الكلمات المستهدف: {episode.target_words} كلمة تقريبًا. لا تقل عن {int(episode.target_words * MIN_EPISODE_COMPLETION_RATIO)} كلمة.
 وظيفة البارت: {chapter_role(episode.part_number, plan.episode_count)}
@@ -257,9 +247,9 @@ def build_episode_continuation_prompt(
 ) -> list[dict[str, str]]:
     """Request only the missing natural continuation of an underlength long episode."""
     tail = existing_script[-1_200:]
-    system = """أنت تكمل نصًا صوتيًا عربيًا أصليًا لرواية تحقيق خيالية.
-أعد الاستكمال فقط، بلا عنوان أو تلخيص أو Markdown أو ملاحظات. أكمل من آخر جملة بسلاسة وباللغة نفسها، واحتفظ بالراوي الواحد والإيقاع المتصاعد. لا تكشف الحل النهائي ولا تقلّد أسلوب أي شخص، ولا تقدّم تعليمات لتنفيذ جريمة. لا تُنهِ البارت قبل أن تضيف مشاهد وأدلة وحوارًا قصيرًا كافيًا."""
-    user = f"""هذه متابعة للبارت {episode.part_number} من {plan.episode_count} في رواية «{plan.series_title}».
+    system = """أنت تكمل نصًا صوتيًا عربيًا أصليًا لوثائقي حياة برية.
+أعد الاستكمال فقط، بلا عنوان أو تلخيص أو Markdown أو ملاحظات. أكمل من آخر جملة بسلاسة وباللغة نفسها، واحتفظ بالراوي الواحد والإيقاع المتصاعد. لا تختلق حقائق أو أرقامًا علمية، ولا تقلّد أسلوب أي شخص. لا تُنهِ البارت قبل أن تضيف مشاهد وأدلة وحوارًا قصيرًا كافيًا."""
+    user = f"""هذه متابعة للجزء {episode.part_number} من {plan.episode_count} في وثائقي «{plan.series_title}».
 اللغة: {plan.language}
 الحد الأدنى المطلوب للبارت كاملًا: {minimum_words} كلمة. النص الحالي أقصر من ذلك، لذلك أكمل السرد وحده.
 
@@ -302,10 +292,10 @@ def build_short_prompt(*, script: str, episode: EpisodePlan, series_title: str, 
     source = script[:source_limit]
     if kind != "opening_hook":
         source = script[max(0, len(script) // 3) : max(0, len(script) // 3) + source_limit]
-    system = """أنت كاتب Shorts عربي محترف لقناة روايات تحقيق وغموض. اكتب نصًا أصليًا قصيرًا يُقرأ بصوت راوٍ واحد.
+    system = """أنت كاتب مقاطع قصيرة لقناة وثائقيات الحياة البرية «أسرار البرية». اكتب نصًا علميًا مشوقًا قصيرًا يُقرأ بصوت راوٍ واحد.
 ابدأ خلال أول جملة أو أول 10 كلمات بدليل صادم أو خطر مباشر أو سؤال غامض يجعل المشاهد يريد معرفة الباقي. لا تبدأ بتمهيد عام مثل: في هذه القصة، منذ سنوات، أو دعونا نحكي.
-اجعل الإيقاع سريعًا بجمل قصيرة وصور حسية واضحة، واحتفظ بأهم معلومة ناقصة حتى النهاية. لا تضع عنوانًا أو هاشتاغات أو تعليمات تصوير. لا تكشف الجاني أو الحل، ولا تقلّد أسلوب أي شخص.
-اختم بسؤال محدد يدعو المشاهد لكتابة نظريته، ثم دعوة طبيعية لمتابعة الحلقة الكاملة أو الـPlaylist."""
+اجعل الإيقاع سريعًا بجمل قصيرة وصور حسية واضحة، واحتفظ بأهم معلومة ناقصة حتى النهاية. لا تضع عنوانًا أو هاشتاغات أو تعليمات تصوير. لا تختلق معلومات عن الحيوان، ولا تقلّد أسلوب أي شخص.
+اختم بسؤال محدد يدعو المشاهد لكتابة نظريته، ثم دعوة طبيعية لمتابعة الحلقة الوثائقية الكاملة."""
     user = f"""القصة: {series_title}
 البارت: {episode.part_number}
 نوع الـShort: {kind}
