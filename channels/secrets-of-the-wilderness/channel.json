@@ -1,0 +1,22 @@
+{
+  "channel_name": "أسرار البرية",
+  "channel_slug": "secrets-of-the-wilderness",
+  "language": "ar",
+  "content_style": "hybrid",
+  "narrator_voice": "male",
+  "long_videos_per_week": 3,
+  "timezone": "Africa/Cairo",
+  "genres": [
+    "أسرار الطبيعة",
+    "الحياة البرية",
+    "سلوك الحيوانات",
+    "قصص النجاة والاستكشاف"
+  ],
+  "format": {
+    "long_video_minutes": "8-12",
+    "shorts_per_long": 3,
+    "narration": "Arabic male voice",
+    "visuals": "wildlife footage or generated nature scenes",
+    "captions": "Arabic"
+  }
+}
