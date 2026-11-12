@@ -170,11 +170,11 @@ if word_count < 1300:
     )
     repair_prompt = (
         prompt
-        + "\\n\\nالمحاولة السابقة كانت أقصر من المطلوب. أعد كتابة الحزمة كاملة من البداية، "
+        + "\n\nالمحاولة السابقة كانت أقصر من المطلوب. أعد كتابة الحزمة كاملة من البداية، "
         + "ولا تختصر. اكتب 8 مشاهد، واجعل كل مشهد في قسم التعليق الصوتي نحو 165-190 كلمة "
         + "حتى يصل مجموع السرد وحده إلى 1300-1550 كلمة. لا تغيّر قواعد الدقة أو المصادر. "
         + "أخرج الأقسام الخمسة المطلوبة كاملة."
-        + "\\n\\nالنص السابق الذي لم يحقق الطول:\\n"
+        + "\n\nالنص السابق الذي لم يحقق الطول:\n"
         + script
     )
     retry_payload = json.dumps({
@@ -223,7 +223,7 @@ if word_count < 1300:
     if not voice_match:
         raise SystemExit("Quality gate failed after expansion retry: missing narration section.")
     voice_text = re.sub(r"^#+.*$", " ", voice_match.group(1), flags=re.MULTILINE)
-    voice_words = re.findall(r"[^\\W_]+(?:[’'-][^\\W_]+)*", voice_text, flags=re.UNICODE)
+    voice_words = re.findall(r"\w+", voice_text, flags=re.UNICODE)
     word_count = len(voice_words)
     print(f"Expanded narration length: {word_count} words.")
 
