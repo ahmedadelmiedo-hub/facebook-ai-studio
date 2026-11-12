@@ -14,7 +14,7 @@ prompt = f'''اكتب سيناريو وثائقيًا عربيًا أصليًا 
 الأسلوب: مزيج من الوثائقي المشوق والسرد القصصي، بصوت راوٍ رجالي.
 اكتب افتتاحية قوية، ثم 6 إلى 8 مشاهد متسلسلة، وخاتمة. اجعل المعلومات العلمية دقيقة، ولا تختلق حقائق أو أرقامًا أو اقتباسات. ضع [بحاجة إلى تحقق] بجوار أي معلومة غير مؤكدة. أضف وصفًا بصريًا لكل مشهد، ونصوصًا قصيرة على الشاشة، وثلاث أفكار Shorts في النهاية. اللغة عربية واضحة مناسبة للتعليق الصوتي.'''
 payload = json.dumps({'model':'llama-3.3-70b-versatile','messages':[{'role':'user','content':prompt}],'temperature':0.6,'max_completion_tokens':7000},ensure_ascii=False).encode()
-req = urllib.request.Request('https://api.groq.com/openai/v1/chat/completions',data=payload,headers={'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'},method='POST')
+req = urllib.request.Request('https://api.groq.com/openai/v1/chat/completions',data=payload,headers={'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json','Accept':'application/json','User-Agent':'secrets-of-the-wilderness/1.0'},method='POST')
 try:
     with urllib.request.urlopen(req, timeout=240) as response:
         data = json.loads(response.read().decode())
