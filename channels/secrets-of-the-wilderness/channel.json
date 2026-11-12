@@ -14,7 +14,7 @@
   ],
   "format": {
     "long_video_minutes": "8-12",
-    "shorts_per_long": 3,
+    "shorts_per_long": 2,
     "narration": "Arabic male voice",
     "visuals": "wildlife footage or generated nature scenes",
     "captions": "Arabic"
