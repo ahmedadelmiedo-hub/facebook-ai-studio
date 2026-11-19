@@ -18,6 +18,7 @@ KIDS_PUBLISH_ENABLED=false
 ```bash
 python -m unittest discover -s tests -v
 python -m core.kids_factory --mode prepare --episode-id kids-ep-001
+python -m core.kids_script_engine --episode-id kids-ep-001 --provider mock
 ```
 
 ينتج التحضير:
@@ -29,6 +30,8 @@ content/production/kids/kids-ep-001/storyboard.json
 ```
 
 هذه ملفات تحضير وليست حلقة MP4 مكتملة. الإنتاج الفعلي يحتاج مزود كتابة وصوت وأصول مشاهد، ثم FFmpeg، ثم بوابة جودة وموافقة بشرية.
+
+محرك النصوص يستخدم `mock` تلقائيًا عند غياب المفتاح. لتشغيل مزود OpenAI-compatible اختياريًا، يوضع المفتاح في Secret باسم `KIDS_TEXT_API_KEY` وتُضبط `KIDS_TEXT_PROVIDER` و`KIDS_TEXT_BASE_URL` و`KIDS_TEXT_MODEL`. لا يرسل المسار أي طلب خارجي في وضع Mock.
 
 ## المراحل المستهدفة
 

@@ -37,7 +37,14 @@ def fingerprint(story: dict[str, Any], rules: dict[str, Any]) -> str:
 def safety_issues(story: dict[str, Any], rules: dict[str, Any]) -> list[str]:
     text = normalize(" ".join(str(story.get(key, "")) for key in ("title", "learning_goal", "setting", "conflict")))
     forbidden = rules["safety"]["forbidden_topics"]
-    return [f"forbidden topic: {term}" for term in forbidden if normalize(term) in text]
+    # Match complete Arabic words/phrases only. A raw substring check would flag
+    # safe words such as "نرتب" because they happen to contain "رعب"-like fragments.
+    arabic = r"\u0600-\u06FF"
+    return [
+        f"forbidden topic: {term}"
+        for term in forbidden
+        if re.search(rf"(?<![{arabic}]){re.escape(normalize(term))}(?![{arabic}])", text)
+    ]
 
 
 def validate_story(story: dict[str, Any], rules: dict[str, Any]) -> list[str]:

@@ -25,6 +25,7 @@ concurrency:
 env:
   KIDS_PRODUCTION_ENABLED: "false"
   KIDS_PUBLISH_ENABLED: "false"
+  KIDS_TEXT_PROVIDER: "mock"
 
 jobs:
   prepare:
@@ -39,6 +40,10 @@ jobs:
         env:
           EPISODE_ID: ${{ inputs.episode_id }}
         run: python -m core.kids_factory --mode prepare $([[ -n "$EPISODE_ID" ]] && echo "--episode-id $EPISODE_ID" || true)
+      - name: Generate and validate Arabic script
+        env:
+          EPISODE_ID: ${{ inputs.episode_id }}
+        run: python -m core.kids_script_engine --episode-id "${EPISODE_ID:-kids-ep-001}" --provider mock
       - name: Run backend tests
         run: python -m unittest discover -s tests -v
       - name: Persist review artifact

@@ -16,7 +16,7 @@
   "fingerprint": "0690266fc5e14344",
   "status": "prepared_for_review",
   "provider_status": {
-    "text": "not_called",
+    "text": "mock",
     "image": "not_called",
     "voice": "not_called",
     "video": "not_called"
@@ -31,14 +31,15 @@
       "character_consistency",
       "has_human_approval"
     ],
-    "human_approval": false
+    "human_approval": false,
+    "script_validation": "passed"
   },
   "publishing": {
     "enabled": false,
     "privacy": "private",
     "youtube_video_id": null
   },
-  "created_at": "2026-11-19T19:34:28.272749+00:00",
+  "created_at": "2026-11-19T19:37:55.516938+00:00",
   "artifacts": {
     "script": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/script.md",
     "storyboard": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/storyboard.json",
