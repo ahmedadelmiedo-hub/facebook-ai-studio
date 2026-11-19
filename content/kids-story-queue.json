@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "channel": "hikayatuna-kids",
+  "status": "review_only",
+  "stories": [
+    {"episode_id":"kids-ep-001","title":"مصباح نوري لا ينام","content_type":"educational_story","learning_goal":"ترتيب خطوات ما قبل النوم","setting":"غرفة نوم دافئة ليلًا","conflict":"مصباح نوري لا يهدأ","character_pair":["nouri","rima","timo"],"duration_minutes":3,"status":"queued"},
+    {"episode_id":"kids-ep-002","title":"ريما ولون السماء","content_type":"letters_numbers_colors","learning_goal":"تمييز اللون الأزرق","setting":"حديقة صباحية","conflict":"اختلاط الألوان في لعبة الرسم","character_pair":["rima","basim"],"duration_minutes":3,"status":"queued"},
+    {"episode_id":"kids-ep-003","title":"باسم يعدّ النجوم","content_type":"letters_numbers_colors","learning_goal":"العد من واحد إلى خمسة","setting":"سطح بيت آمن ومضيء","conflict":"نسيان ترتيب الأعداد","character_pair":["basim","nouri"],"duration_minutes":3,"status":"queued"},
+    {"episode_id":"kids-ep-004","title":"تيمو يقول شكرًا","content_type":"positive_values","learning_goal":"التعبير عن الامتنان","setting":"مطبخ العائلة","conflict":"نسيان شكر الصديق","character_pair":["timo","rima"],"duration_minutes":3,"status":"queued"}
+  ]
+}

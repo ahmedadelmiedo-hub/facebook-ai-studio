@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "style": "original_high_quality_3d_cartoon",
+  "characters": [
+    {"id":"rima","name":"ريما","role":"المستكشفة","age_appearance":"5","identity_anchors":["teal headband","coral overalls","small star badge","warm curious eyes"],"voice":"clear gentle child voice","forbidden_changes":["different hair silhouette","branded clothing","scary expression"]},
+    {"id":"nouri","name":"نوري","role":"اليراعة المضيئة","age_appearance":"childlike creature","identity_anchors":["mint-green body","yellow lantern belly","round glasses","small wings"],"voice":"soft bright childlike voice","forbidden_changes":["different body color","missing lantern belly","sharp scary teeth"]},
+    {"id":"basim","name":"باسم","role":"الصديق الهادئ","age_appearance":"childlike elephant","identity_anchors":["blue body","orange scarf","small notebook","rounded ears"],"voice":"slow reassuring child voice","forbidden_changes":["different animal","weapon or uniform","angry face"]},
+    {"id":"timo","name":"تيمو","role":"المبادر المرح","age_appearance":"4","identity_anchors":["orange fox cub","yellow hoodie","green backpack","big friendly tail"],"voice":"playful clear child voice","forbidden_changes":["different animal","aggressive pose","branded clothing"]}
+  ]
+}

@@ -1,0 +1,61 @@
+name: Hikayatuna Kids - daily prepare
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      episode_id:
+        description: "Optional episode ID, e.g. kids-ep-001"
+        required: false
+        type: string
+      prepare_only:
+        description: "Prepare manifest and QA inputs only; never publish"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hikayatuna-kids-production
+  cancel-in-progress: false
+
+env:
+  KIDS_PRODUCTION_ENABLED: "false"
+  KIDS_PUBLISH_ENABLED: "false"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate and prepare next episode
+        env:
+          EPISODE_ID: ${{ inputs.episode_id }}
+        run: python -m core.kids_factory --mode prepare $([[ -n "$EPISODE_ID" ]] && echo "--episode-id $EPISODE_ID" || true)
+      - name: Run backend tests
+        run: python -m unittest discover -s tests -v
+      - name: Persist review artifact
+        run: |
+          git config user.name "hikayatuna-kids-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/kids-production
+          if git diff --cached --quiet; then
+            echo "No new review artifact."
+          else
+            git commit -m "chore: prepare kids episode for review"
+            git push
+          fi
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hikayatuna-kids-review-${{ github.run_number }}
+          path: content/kids-production/
+          if-no-files-found: warn
+          retention-days: 14

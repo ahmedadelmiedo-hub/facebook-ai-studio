@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "audience": {"min_age": 3, "max_age": 6},
+  "language": {"required": "العربية الفصحى المبسطة", "forbidden": ["ألفاظ مخيفة", "سخرية جارحة", "مصطلحات عنيفة"]},
+  "safety": {"forbidden_topics": ["جريمة", "موت", "دم", "رعب", "أسلحة", "إيذاء", "مخدرات", "خطر غير مشروح"], "require_positive_resolution": true, "require_adult_safe": true},
+  "originality": {"fingerprint_fields": ["content_type", "learning_goal", "setting", "conflict", "character_pair"], "similarity_threshold": 0.8, "never_repeat_episode_id": true},
+  "quality_gate": ["age_safety", "simple_arabic", "original_characters", "original_or_licensed_audio", "character_consistency", "has_human_approval"],
+  "publishing": {"default_privacy": "private", "require_owner_approval": true, "automatic_public_publish": false}
+}

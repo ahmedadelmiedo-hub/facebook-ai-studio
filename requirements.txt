@@ -1,4 +1,5 @@
-# Runtime dependency for vertical video rendering.
+# Optional runtime dependency for legacy/media rendering paths.
+# The safe kids prepare workflow itself uses Python standard library only.
 moviepy==1.0.3
 requests>=2.31.0
 static-ffmpeg==3.0
