@@ -84,12 +84,12 @@ jobs:
           ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 "$VIDEO" | grep -q .
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$VIDEO")
           python -c 'import sys; d=float(sys.argv[1]); assert 179 <= d <= 181, f"duration out of range: {d}"' "$DURATION"
-      - name: Persist review artifact
+      - name: Persist review metadata (exclude large media files)
         if: github.event_name != 'pull_request'
         run: |
           git config user.name "hikayatuna-kids-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add content/production/kids
+          git add content/production/kids/*/manifest.json content/production/kids/*/script.md content/production/kids/*/storyboard.json content/production/kids/*/quality-report.json
           if git diff --cached --quiet; then
             echo "No new review artifact."
           else
