@@ -212,19 +212,23 @@ def mux_audio_and_captions(
     fonts_dir: Path | None = None,
 ) -> None:
     """Mux narration and burn ASS captions into the visual video."""
-    subtitle_filter = None
+    # Scene clips are frame-quantized; concatenation can finish a few seconds
+    # early. Extend the final picture rather than truncating the full narration.
+    audio_duration = probe_duration(audio_path)
+    video_filter = "tpad=stop_mode=clone:stop_duration=10"
     if captions_path:
         subtitle_filter = f"subtitles=filename='{captions_path.as_posix()}'"
         if fonts_dir:
             subtitle_filter += f":fontsdir='{fonts_dir.as_posix()}'"
-    command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video_path), "-i", str(audio_path)]
-    if subtitle_filter:
-        command.extend(["-vf", subtitle_filter])
-    command.extend([
+        video_filter = f"{subtitle_filter},{video_filter}"
+    command = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", str(video_path), "-i", str(audio_path),
+        "-vf", video_filter,
         "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "veryfast",
         "-crf", "22", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-        "-shortest", str(output_path),
-    ])
+        "-t", f"{audio_duration:.3f}", "-movflags", "+faststart", str(output_path),
+    ]
     _run(command)
 
 
