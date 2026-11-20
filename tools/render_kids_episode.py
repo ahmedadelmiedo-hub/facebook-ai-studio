@@ -125,7 +125,7 @@ def make_scene_art(index: int, out: Path) -> None:
 
 
 async def make_voice(text: str, out: Path) -> None:
-    communicate = edge_tts.Communicate(text, VOICE, rate="-8%", volume="+0%")
+    communicate = edge_tts.Communicate(text, VOICE, rate="+0%", volume="+0%")
     await communicate.save(str(out))
 
 
