@@ -150,6 +150,7 @@ def main() -> int:
     concat_list = assets / "audio.concat.txt"
     concat_entries: list[str] = []
     storyboard_scenes = []
+    artwork_sources: list[str] = []
 
     for idx, scene in enumerate(scenes, start=1):
         parts = [scene["narration"], scene["dialogue"]]
@@ -160,7 +161,14 @@ def main() -> int:
         make_voice(spoken,audio_path)
         duration = probe_duration(audio_path)
         image_path = image_dir / f"scene-{idx:02d}.png"
-        generate_scene_image(idx, image_path, scene)
+        try:
+            generate_scene_image(idx, image_path, scene)
+            artwork_sources.append("aihorde_community")
+        except Exception as exc:
+            # Keep the production run free and finishable when anonymous workers are unavailable.
+            make_scene_art(idx, image_path)
+            artwork_sources.append("original_local_fallback")
+            print(f"AI Horde unavailable for scene {idx}; using original local artwork: {type(exc).__name__}", file=sys.stderr)
         scene_audio.append(audio_path)
         scene_durations.append(duration)
         concat_entries.append(f"file '{audio_path.resolve().as_posix()}'")
@@ -214,14 +222,15 @@ def main() -> int:
     manifest_path = episode_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["status"]="rendered_for_private_review"
-    manifest["provider_status"]={"text":script.get("provider","unknown"),"image":"aihorde_community_workers","voice":VOICE,"video":"ffmpeg"}
+    manifest["provider_status"]={"text":script.get("provider","unknown"),"image":"aihorde_with_original_local_fallback","voice":VOICE,"video":"ffmpeg"}
     manifest["quality_gate"]["status"]="blocked"
     manifest["quality_gate"]["human_approval"]=False
     manifest["quality_gate"]["media_validation"]={"mp4_exists":True,"duration_seconds":round(final_duration,2),"has_narration":True,"captions":"burned_in"}
     manifest["publishing"]={"enabled":False,"privacy":"private","youtube_video_id":None}
     manifest["artifacts"]["video"]=str(output.relative_to(ROOT))
     manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    report={"episode_id":args.episode_id,"video":str(output.relative_to(ROOT)),"duration_seconds":round(final_duration,2),"voice":VOICE,"voice_source":"Edge TTS service; no API key configured","captions":"Arabic ASS burned into video","artwork":"AI Horde community-generated illustrations","music":"none; no unlicensed music used","privacy":"private review only","public_publish":False}
+    report={"episode_id":args.episode_id,"video":str(output.relative_to(ROOT)),"duration_seconds":round(final_duration,2),"voice":VOICE,"voice_source":"Edge TTS service; no API key configured","captions":"Arabic ASS burned into video","artwork":"AI Horde community illustrations with original local fallback when unavailable",
+        "artwork_sources":artwork_sources,"music":"none; no unlicensed music used","privacy":"private review only","public_publish":False}
     (episode_dir/"quality-report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(report,ensure_ascii=False))
     return 0
