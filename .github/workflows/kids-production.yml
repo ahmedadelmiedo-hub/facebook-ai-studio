@@ -1,6 +1,8 @@
 name: Hikayatuna Kids - daily prepare
 
 on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
@@ -36,23 +38,54 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install Python dependencies
-        run: python -m pip install -r requirements.txt
-      - name: Validate and prepare next episode
+      # Backend tests import requests through the avatar provider module.
+      - name: Install backend test dependency
+        run: python -m pip install requests
+      - name: Validate and prepare episode
         env:
-          EPISODE_ID: ${{ inputs.episode_id }}
-        run: python -m core.kids_factory --mode prepare $([[ -n "$EPISODE_ID" ]] && echo "--episode-id $EPISODE_ID" || true)
-      - name: Generate and validate Arabic script
+          EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
+        run: python -m core.kids_factory --mode prepare --episode-id "$EPISODE_ID"
+      - name: Validate curated Arabic episode script
         env:
-          EPISODE_ID: ${{ inputs.episode_id }}
-        run: python -m core.kids_script_engine --episode-id "${EPISODE_ID:-kids-ep-001}" --provider mock
+          EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path("content/production/kids") / os.environ["EPISODE_ID"] / "script.json"
+          data = json.loads(p.read_text(encoding="utf-8"))
+          assert len(data.get("scenes", [])) == 6, "episode must have six scenes"
+          assert all(s.get("narration") and s.get("dialogue") for s in data["scenes"]), "incomplete scene"
+          assert data.get("publish_enabled") is False, "public publishing must remain disabled"
+          print({"status": "curated_script_valid", "words": data.get("word_count")})
+          PY
       - name: Run backend tests
         run: python -m unittest discover -s tests -v
+      - name: Install media runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core espeak-ng
+          python -m pip install --upgrade pip
+          python -m pip install Pillow edge-tts
+      - name: Render private three-minute Arabic episode
+        env:
+          EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
+        run: python tools/render_kids_episode.py --episode-id "$EPISODE_ID"
+      - name: Verify rendered MP4
+        env:
+          EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
+        run: |
+          VIDEO="content/production/kids/$EPISODE_ID/episode.mp4"
+          test -s "$VIDEO"
+          ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 "$VIDEO" | grep -q .
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$VIDEO")
+          python -c 'import sys; d=float(sys.argv[1]); assert 179 <= d <= 181, f"duration out of range: {d}"' "$DURATION"
       - name: Persist review artifact
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "hikayatuna-kids-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add content/kids-production
+          git add content/production/kids
           if git diff --cached --quiet; then
             echo "No new review artifact."
           else
@@ -63,6 +96,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hikayatuna-kids-review-${{ github.run_number }}
-          path: content/kids-production/
-          if-no-files-found: warn
+          path: content/production/kids/
+          if-no-files-found: error
           retention-days: 14
