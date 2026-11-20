@@ -9,16 +9,17 @@ import argparse
 import asyncio
 import json
 import subprocess
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 import edge_tts
 from PIL import Image, ImageDraw
 
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
-from core.kids_script_engine import flatten_spoken
 from core.scene_renderer import probe_duration, render_visual_video
-
-ROOT = Path(__file__).resolve().parents[1]
 VOICE = "ar-EG-ShakirNeural"
 W, H = 1920, 1080
 
