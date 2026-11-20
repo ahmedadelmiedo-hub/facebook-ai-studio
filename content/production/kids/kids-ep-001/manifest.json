@@ -1,25 +1,25 @@
 {
   "schema_version": 1,
   "episode_id": "kids-ep-001",
-  "title": "مصباح نوري لا ينام",
+  "title": "تيمو والنجمة الضائعة",
   "channel": "حكاياتنا",
   "audience": "3-6",
   "language": "modern_standard_arabic_simple",
   "duration_minutes": 3,
-  "content_type": "educational_story",
-  "learning_goal": "ترتيب خطوات ما قبل النوم",
+  "content_type": "positive_values",
+  "learning_goal": "التعاون ومساعدة الآخرين والرفق بالكائنات الصغيرة",
   "characters": [
-    "nouri",
+    "timo",
     "rima",
-    "timo"
+    "nouri"
   ],
-  "fingerprint": "0690266fc5e14344",
-  "status": "render_requested",
+  "fingerprint": "918b685f40d270a9",
+  "status": "script_ready_for_render",
   "provider_status": {
-    "text": "mock",
+    "text": "curated_human_authored",
     "image": "not_called",
-    "voice": "not_called",
-    "video": "not_called"
+    "voice": "fish_audio_not_called",
+    "video": "ffmpeg_not_called"
   },
   "quality_gate": {
     "status": "blocked",
@@ -41,11 +41,11 @@
   },
   "created_at": "2026-11-19T19:37:55.516938+00:00",
   "artifacts": {
-    "script": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/script.md",
-    "storyboard": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/storyboard.json",
-    "video": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/episode.mp4",
-    "short": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/short.mp4",
-    "quality": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/quality-report.json"
+    "script": "content/production/kids/kids-ep-001/script.md",
+    "storyboard": "content/production/kids/kids-ep-001/storyboard.json",
+    "video": "content/production/kids/kids-ep-001/episode.mp4",
+    "short": "content/production/kids/kids-ep-001/short.mp4",
+    "quality": "content/production/kids/kids-ep-001/quality-report.json"
   },
   "review_target": "youtube_studio_private"
 }
