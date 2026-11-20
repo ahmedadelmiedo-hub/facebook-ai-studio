@@ -45,10 +45,20 @@ jobs:
         env:
           EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
         run: python -m core.kids_factory --mode prepare --episode-id "$EPISODE_ID"
-      - name: Generate and validate Arabic script
+      - name: Validate curated Arabic episode script
         env:
           EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
-        run: python -m core.kids_script_engine --episode-id "$EPISODE_ID" --provider mock
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path("content/production/kids") / os.environ["EPISODE_ID"] / "script.json"
+          data = json.loads(p.read_text(encoding="utf-8"))
+          assert len(data.get("scenes", [])) == 6, "episode must have six scenes"
+          assert all(s.get("narration") and s.get("dialogue") for s in data["scenes"]), "incomplete scene"
+          assert data.get("publish_enabled") is False, "public publishing must remain disabled"
+          print({"status": "curated_script_valid", "words": data.get("word_count")})
+          PY
       - name: Run backend tests
         run: python -m unittest discover -s tests -v
       - name: Install media runtime
