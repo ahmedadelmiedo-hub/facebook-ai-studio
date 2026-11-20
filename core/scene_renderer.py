@@ -110,12 +110,12 @@ def _motion_filter(scene: dict[str, Any], width: int, height: int, fps: int) -> 
         # Use a large normalized canvas, then pan inside it frame by frame.
         return (
             f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase," 
-            f"crop={width*2}:{height*2},zoompan=z=1.0:x='{x_expr}':y='(ih-oh)/2':d={frames}:s={width}x{height}:fps={fps},format=yuv420p"
+            f"crop={width*2}:{height*2},zoompan=z=1.0:x='{x_expr}':y='(ih-oh)/2':d=1:s={width}x{height}:fps={fps},format=yuv420p"
         )
     zoom_expr = "min(zoom+0.0008,1.05)" if motion_type != "push_in" else "min(zoom+0.0012,1.08)"
     return (
         f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase," 
-        f"crop={width*2}:{height*2},zoompan=z='{zoom_expr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={width}x{height}:fps={fps},format=yuv420p"
+        f"crop={width*2}:{height*2},zoompan=z='{zoom_expr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={width}x{height}:fps={fps},format=yuv420p"
     )
 
 
@@ -124,7 +124,7 @@ def _render_scene(image: Path, scene: dict[str, Any], output: Path, width: int, 
     vf = _motion_filter(scene, width, height, fps)
     command = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-loop", "1", "-i", str(image), "-t", f"{duration:.3f}",
+        "-loop", "1", "-framerate", str(fps), "-i", str(image), "-t", f"{duration:.3f}",
         "-vf", vf,
         "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps),
         str(output),
