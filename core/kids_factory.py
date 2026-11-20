@@ -127,12 +127,12 @@ def prepare_episode(episode_id: str | None = None) -> Path:
             lines.extend(["## أنشودة القصة", "", curated["original_song"], ""])
         if curated.get("quiz"):
             lines.extend(["## سؤال للأصدقاء", "", curated["quiz"], ""])
-        script_markdown = "\\n".join(lines).rstrip() + "\\n"
+        script_markdown = "\n".join(lines).rstrip() + "\n"
     else:
         script_markdown = (
-            f"# {story['title']}\\n\\n"
-            "[PREPARED ONLY] النص الفعلي يحتاج مزود كتابة معتمد ومراجعة بشرية قبل الإنتاج.\\n\\n"
-            f"هدف التعلم: {story['learning_goal']}\\n"
+            f"# {story['title']}\n\n"
+            "[PREPARED ONLY] النص الفعلي يحتاج مزود كتابة معتمد ومراجعة بشرية قبل الإنتاج.\n\n"
+            f"هدف التعلم: {story['learning_goal']}\n"
         )
     (out_dir / "script.md").write_text(script_markdown, encoding="utf-8")
     (out_dir / "storyboard.json").write_text(json.dumps({"status":"pending_provider","scenes":[]}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
