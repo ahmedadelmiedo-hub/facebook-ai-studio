@@ -1,6 +1,8 @@
 name: Hikayatuna Kids - daily prepare
 
 on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
@@ -67,6 +69,7 @@ jobs:
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$VIDEO")
           python -c 'import sys; d=float(sys.argv[1]); assert 179 <= d <= 181, f"duration out of range: {d}"' "$DURATION"
       - name: Persist review artifact
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "hikayatuna-kids-bot"
           git config user.email "actions@users.noreply.github.com"
