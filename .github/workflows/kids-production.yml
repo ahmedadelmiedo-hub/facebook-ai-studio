@@ -64,7 +64,7 @@ jobs:
       - name: Install media runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-core
+          sudo apt-get install -y ffmpeg fonts-noto-core espeak-ng
           python -m pip install --upgrade pip
           python -m pip install Pillow edge-tts
       - name: Render private three-minute Arabic episode
