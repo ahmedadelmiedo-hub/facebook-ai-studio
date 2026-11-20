@@ -33,6 +33,16 @@ content/production/kids/kids-ep-001/storyboard.json
 
 محرك النصوص يستخدم `mock` تلقائيًا عند غياب المفتاح. لتشغيل مزود OpenAI-compatible اختياريًا، يوضع المفتاح في Secret باسم `KIDS_TEXT_API_KEY` وتُضبط `KIDS_TEXT_PROVIDER` و`KIDS_TEXT_BASE_URL` و`KIDS_TEXT_MODEL`. لا يرسل المسار أي طلب خارجي في وضع Mock.
 
+## الإنتاج السحابي المجاني
+
+- صور المشاهد تُنشأ عبر Cloudflare Workers AI باستخدام `@cf/black-forest-labs/flux-1-schnell`؛ لا توجد نماذج تُنزّل أو تعمل على جهاز المستخدم.
+- الراوي يستخدم Edge TTS المستضاف بصوت مصري رجالي `ar-EG-ShakirNeural`. إذا تعذّر الاتصال، تتوقف المهمة بدل استخدام صوت محلي منخفض الجودة.
+- تحريك الصور وتجميعها وإضافة الترجمة يتم على GitHub-hosted runners باستخدام FFmpeg. هذا إخراج قصصي متحرك بحركة كاميرا على الصور، وليس توليد فيديو AI بحركة كاملة للشخصيات.
+- حصة Cloudflare Workers AI المجانية المنشورة هي 10,000 Neurons يوميًا، وتُعاد عند 00:00 UTC؛ عند نفادها تفشل الطلبات بدل التحويل التلقائي إلى خطة مدفوعة. راجع [التسعير الرسمي](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+- يلزم إعداد GitHub Actions Secrets باسمَي `CLOUDFLARE_ACCOUNT_ID` و`CLOUDFLARE_API_TOKEN` (صلاحية Workers AI). لا تُحفظ المفاتيح في الملفات أو السجلات.
+- من Actions شغّل `Hikayatuna Kids - daily prepare`. اترك `prepare_only=true` للتحضير والاختبارات فقط؛ اختر `false` لتوليد الحلقة الخاصة. لا يوجد نشر عام تلقائي.
+- لم يعد هناك تشغيل مجدول يومي يستهلك موارد دون طلب، ولا يتم استدعاء vidIQ في هذا المسار.
+
 ## المراحل المستهدفة
 
 `idea → script → storyboard → scenes → Arabic voice → FFmpeg MP4 → Shorts → quality gate → owner approval → optional YouTube publish`
