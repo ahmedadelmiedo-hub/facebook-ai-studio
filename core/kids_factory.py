@@ -110,7 +110,31 @@ def prepare_episode(episode_id: str | None = None) -> Path:
         "artifacts": {"script": str(out_dir / "script.md"), "storyboard": str(out_dir / "storyboard.json"), "video": str(out_dir / "episode.mp4"), "short": str(out_dir / "short.mp4"), "quality": str(out_dir / "quality-report.json")},
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (out_dir / "script.md").write_text(f"# {story['title']}\n\n[PREPARED ONLY] النص الفعلي يحتاج مزود كتابة معتمد ومراجعة بشرية قبل الإنتاج.\n\nهدف التعلم: {story['learning_goal']}\n", encoding="utf-8")
+    curated_script_path = out_dir / "script.json"
+    if curated_script_path.is_file():
+        curated = read_json(curated_script_path)
+        lines = [f"# {story['title']}", "", f"**هدف التعلم:** {story['learning_goal']}", ""]
+        for scene in curated.get("scenes", []):
+            lines.extend([
+                f"## المشهد {scene.get('number', '')}: {scene.get('setting', '')}",
+                "",
+                scene.get("narration", ""),
+                "",
+                f"**الحوار:** {scene.get('dialogue', '')}",
+                "",
+            ])
+        if curated.get("original_song"):
+            lines.extend(["## أنشودة القصة", "", curated["original_song"], ""])
+        if curated.get("quiz"):
+            lines.extend(["## سؤال للأصدقاء", "", curated["quiz"], ""])
+        script_markdown = "\n".join(lines).rstrip() + "\n"
+    else:
+        script_markdown = (
+            f"# {story['title']}\n\n"
+            "[PREPARED ONLY] النص الفعلي يحتاج مزود كتابة معتمد ومراجعة بشرية قبل الإنتاج.\n\n"
+            f"هدف التعلم: {story['learning_goal']}\n"
+        )
+    (out_dir / "script.md").write_text(script_markdown, encoding="utf-8")
     (out_dir / "storyboard.json").write_text(json.dumps({"status":"pending_provider","scenes":[]}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return out_dir / "manifest.json"
 

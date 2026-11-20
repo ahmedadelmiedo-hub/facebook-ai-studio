@@ -110,12 +110,12 @@ def _motion_filter(scene: dict[str, Any], width: int, height: int, fps: int) -> 
         # Use a large normalized canvas, then pan inside it frame by frame.
         return (
             f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase," 
-            f"crop={width*2}:{height*2},zoompan=z=1.0:x='{x_expr}':y='(ih-oh)/2':d={frames}:s={width}x{height}:fps={fps},format=yuv420p"
+            f"crop={width*2}:{height*2},zoompan=z=1.0:x='{x_expr}':y='(ih-oh)/2':d=1:s={width}x{height}:fps={fps},format=yuv420p"
         )
     zoom_expr = "min(zoom+0.0008,1.05)" if motion_type != "push_in" else "min(zoom+0.0012,1.08)"
     return (
         f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase," 
-        f"crop={width*2}:{height*2},zoompan=z='{zoom_expr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={width}x{height}:fps={fps},format=yuv420p"
+        f"crop={width*2}:{height*2},zoompan=z='{zoom_expr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={width}x{height}:fps={fps},format=yuv420p"
     )
 
 
@@ -124,9 +124,9 @@ def _render_scene(image: Path, scene: dict[str, Any], output: Path, width: int, 
     vf = _motion_filter(scene, width, height, fps)
     command = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-loop", "1", "-i", str(image), "-t", f"{duration:.3f}",
+        "-loop", "1", "-framerate", str(fps), "-i", str(image), "-t", f"{duration:.3f}",
         "-vf", vf,
-        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps),
+        "-an", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", str(fps),
         str(output),
     ]
     _run(command)
@@ -212,19 +212,23 @@ def mux_audio_and_captions(
     fonts_dir: Path | None = None,
 ) -> None:
     """Mux narration and burn ASS captions into the visual video."""
-    subtitle_filter = None
+    # Scene clips are frame-quantized; concatenation can finish a few seconds
+    # early. Extend the final picture rather than truncating the full narration.
+    audio_duration = probe_duration(audio_path)
+    video_filter = "tpad=stop_mode=clone:stop_duration=10"
     if captions_path:
         subtitle_filter = f"subtitles=filename='{captions_path.as_posix()}'"
         if fonts_dir:
             subtitle_filter += f":fontsdir='{fonts_dir.as_posix()}'"
-    command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video_path), "-i", str(audio_path)]
-    if subtitle_filter:
-        command.extend(["-vf", subtitle_filter])
-    command.extend([
+        video_filter = f"{subtitle_filter},{video_filter}"
+    command = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", str(video_path), "-i", str(audio_path),
+        "-vf", video_filter,
         "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "veryfast",
         "-crf", "22", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-        "-shortest", str(output_path),
-    ])
+        "-t", f"{audio_duration:.3f}", "-movflags", "+faststart", str(output_path),
+    ]
     _run(command)
 
 
@@ -275,7 +279,7 @@ def render_visual_video(
     plan = load_scene_plan(scene_plan)
     audio_duration = probe_duration(audio_path)
     validate_scene_plan(plan, audio_duration)
-    width, height = (1080, 1920) if profile == "short" else (1920, 1080)
+    width, height = (1080, 1920) if profile == "short" else (1280, 720)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="scene-render-") as temp_dir:
         temp_root = Path(temp_dir)
