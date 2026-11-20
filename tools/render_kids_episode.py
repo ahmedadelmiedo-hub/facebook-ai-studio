@@ -152,7 +152,10 @@ def main() -> int:
     storyboard_scenes = []
 
     for idx, scene in enumerate(scenes, start=1):
-        spoken = " ".join(part.strip() for part in (scene["narration"],scene["dialogue"]) if part.strip())
+        parts = [scene["narration"], scene["dialogue"]]
+        if idx == len(scenes):
+            parts.extend([script.get("original_song", ""), script.get("quiz", "")])
+        spoken = " ".join(part.strip() for part in parts if part and part.strip())
         audio_path = audio_dir / f"scene-{idx:02d}.mp3"
         asyncio.run(make_voice(spoken,audio_path))
         duration = probe_duration(audio_path)
