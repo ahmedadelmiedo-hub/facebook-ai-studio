@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw
 
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.scene_renderer import probe_duration, render_visual_video
+from core.cloud_artwork import generate_scene_image
 VOICE = "ar-EG-ShakirNeural"
 W, H = 1920, 1080
 
@@ -174,7 +175,7 @@ def main() -> int:
         asyncio.run(make_voice(spoken,audio_path))
         duration = probe_duration(audio_path)
         image_path = image_dir / f"scene-{idx:02d}.png"
-        make_scene_art(idx,image_path)
+        generate_scene_image(idx, image_path, scene)
         scene_audio.append(audio_path)
         scene_durations.append(duration)
         concat_entries.append(f"file '{audio_path.resolve().as_posix()}'")
