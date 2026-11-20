@@ -1,124 +1,132 @@
-"""Cloud-hosted AI artwork for the Hikayatuna Kids renderer.
+"""Free cloud artwork through the volunteer-run AI Horde.
 
-Uses Cloudflare Workers AI FLUX.1 schnell. No local model, no paid vidIQ credits,
-and deliberately no low-quality local-art fallback.
+No cloud account, payment method, paid credits, or local GPU is required.
+Anonymous requests are lowest priority and may wait or be rejected under load.
 """
 from __future__ import annotations
 
-import base64
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
 
-MODEL = "@cf/black-forest-labs/flux-1-schnell"
+API = "https://aihorde.net/api/v2"
+ANONYMOUS_KEY = "0000000000"
+
 CHARACTER_BIBLE = (
-    "Keep these original characters visually consistent in every image: "
+    "Original children's story characters; keep their appearance consistent: "
     "Nouri is a tiny cute emerald-green firefly, round body, two delicate "
     "translucent wings, large kind expressive eyes, two short antennae, "
-    "a warm golden glowing abdomen; Rima is a cheerful young girl with "
-    "dark brown hair, turquoise headband and coral-pink pajamas; Timo is "
-    "a small friendly orange fox cub with cream muzzle and a soft yellow hoodie. "
+    "warm golden glowing abdomen. Rima is a cheerful young girl with dark "
+    "brown hair, turquoise headband and coral-pink pajamas. Timo is a small "
+    "friendly orange fox cub with cream muzzle and a soft yellow hoodie. "
 )
 STYLE = (
-    "Premium feature-quality 3D animated family film still, beautiful polished "
-    "storybook art direction, expressive appealing character design, cinematic "
-    "soft global illumination, rich but gentle colors, intricate cozy bedroom "
-    "details, warm golden practical lighting, magical firefly particles, "
-    "professional composition, child-safe and soothing bedtime mood. "
-    "Wide 16:9 landscape frame. No text, no letters, no watermark, no logo, "
-    "no horror, no scary faces, no extra limbs, no distorted anatomy."
+    "beautiful polished 3D animated storybook illustration, appealing expressive "
+    "character design, cinematic soft lighting, rich gentle colors, cozy bedroom "
+    "details, warm golden light, magical firefly particles, professional wide "
+    "16:9 composition, child-safe soothing bedtime mood. No text, no watermark, "
+    "no logo, no horror, no scary faces, no extra limbs, no distorted anatomy."
 )
 SHOTS = {
-    1: "Establishing shot of a magical cozy child's bedroom at twilight. Nouri "
-       "floats above scattered colorful toys beside a softly glowing bedside lamp, "
-       "looking sleepy and curious. A crescent moon and stars are visible through "
-       "the window. Wide cinematic composition.",
-    2: "Rima enters the warm magical bedroom holding three colorful picture cards. "
-       "Timo the orange fox cub carries a small toy basket. Nouri hovers happily "
-       "to greet his friends. Medium-wide welcoming shot.",
-    3: "The three friends happily tidy the bedroom together: Nouri guides glowing "
-       "blocks into a toy chest, Rima places books on a shelf, and Timo catches "
-       "a rolling ball. Energetic but gentle action, wide shot.",
-    4: "Bedtime preparation scene near a child-friendly washbasin and bedroom "
-       "mirror. Nouri brushes his teeth with a tiny toothbrush while Rima smiles "
-       "encouragingly and Timo holds a folded pajama top. Warm clean bathroom nook.",
-    5: "Quiet calming moment beside the bed and moonlit window. Rima gently dims "
-       "the bedside light, Timo places a little golden star ornament by the pillow, "
-       "and Nouri takes a peaceful slow breath as his golden abdomen glows softly.",
-    6: "Tender final bedtime scene. Nouri lies comfortably tucked beneath a soft "
-       "blanket in his cozy bed, eyes gently closing, while Rima and Timo wave "
-       "goodnight. The room glows with tiny golden stars and peaceful moonlight.",
+    1: "Twilight establishing view of a magical cozy child's bedroom. Nouri floats "
+       "above colorful toys beside a softly glowing bedside lamp. Crescent moon "
+       "and stars through the window.",
+    2: "Rima enters the warm bedroom holding colorful picture cards. Timo carries "
+       "a little toy basket. Nouri hovers happily to greet his friends.",
+    3: "The three friends tidy the bedroom together: Nouri guides glowing blocks "
+       "into a toy chest, Rima places books on a shelf, Timo catches a rolling ball.",
+    4: "Bedtime preparation near a child-friendly washbasin and mirror. Nouri "
+       "brushes his teeth with a tiny toothbrush while Rima smiles and Timo holds "
+       "a folded pajama top.",
+    5: "Quiet calming moment beside the bed and moonlit window. Rima dims the "
+       "bedside light, Timo places a golden star ornament by the pillow, and "
+       "Nouri takes a peaceful breath.",
+    6: "Tender final bedtime scene. Nouri lies tucked beneath a soft blanket, "
+       "eyes gently closing, while Rima and Timo wave goodnight under tiny "
+       "golden stars and peaceful moonlight.",
 }
 
 
 class CloudArtworkError(RuntimeError):
-    """Raised when cloud artwork cannot be generated and validated."""
+    pass
+
+
+def _request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        API + path,
+        data=data,
+        headers={
+            "apikey": ANONYMOUS_KEY,
+            "Client-Agent": "HikayatunaKids:1.0:github-actions",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="GET" if data is None else "POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=90) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[-1000:]
+        raise CloudArtworkError(f"AI Horde returned HTTP {exc.code}: {detail}") from exc
+    except Exception as exc:
+        raise CloudArtworkError(f"AI Horde request failed: {type(exc).__name__}: {exc}") from exc
 
 
 def generate_scene_image(index: int, output: Path, scene: dict[str, Any]) -> None:
-    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
-    token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
-    if not account_id or not token:
-        raise CloudArtworkError(
-            "Cloud image generation is not configured. Add CLOUDFLARE_ACCOUNT_ID "
-            "and CLOUDFLARE_API_TOKEN as GitHub Actions secrets."
-        )
     if index not in SHOTS:
         raise CloudArtworkError(f"No approved visual prompt exists for scene {index}.")
-
-    prompt = (
-        CHARACTER_BIBLE
-        + SHOTS[index]
-        + " Scene context: " + str(scene.get("setting", ""))
-        + ". Action: " + str(scene.get("action", ""))
-        + ". " + STYLE
-    )
-    # The API accepts at most 2048 prompt characters.
-    prompt = prompt[:2048]
-    seed = int(os.environ.get("KIDS_IMAGE_SEED", "711001")) + index
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{MODEL}"
-    payload = json.dumps({"prompt": prompt, "steps": 8, "seed": seed}).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "HikayatunaKidsProduction/1.0",
+    prompt = CHARACTER_BIBLE + SHOTS[index] + " " + STYLE
+    prompt += " Scene setting: " + str(scene.get("setting", ""))
+    prompt += " Scene action: " + str(scene.get("action", ""))
+    submitted = _request("/generate/async", {
+        "prompt": prompt[:1800],
+        "params": {
+            "sampler_name": "k_euler",
+            "cfg_scale": 7,
+            "width": 512,
+            "height": 512,
+            "steps": 25,
+            "n": 1,
         },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=180) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[-1200:]
-        raise CloudArtworkError(
-            f"Cloudflare image API returned HTTP {exc.code}: {detail}"
-        ) from exc
-    except Exception as exc:
-        raise CloudArtworkError(
-            f"Cloudflare image request failed: {type(exc).__name__}: {exc}"
-        ) from exc
-
-    encoded = data.get("result", {}).get("image")
-    if not encoded:
-        raise CloudArtworkError(
-            "Cloudflare returned no image: " + json.dumps(data, ensure_ascii=False)[:1200]
-        )
-    try:
-        image_bytes = base64.b64decode(encoded, validate=True)
-    except Exception as exc:
-        raise CloudArtworkError("Cloud image payload was not valid base64.") from exc
-    if len(image_bytes) < 20_000 or not (
-        image_bytes.startswith(b"\xff\xd8\xff") or image_bytes.startswith(b"\x89PNG")
-    ):
-        raise CloudArtworkError(
-            f"Generated image failed integrity checks ({len(image_bytes)} bytes)."
-        )
+        "nsfw": False,
+        "censor_nsfw": True,
+        "models": ["stable_diffusion"],
+        "r2": True,
+    })
+    job_id = submitted.get("id")
+    if not job_id:
+        raise CloudArtworkError("AI Horde did not return a generation job ID.")
+    deadline = time.monotonic() + 1800
+    while time.monotonic() < deadline:
+        time.sleep(20)
+        check = _request(f"/generate/check/{job_id}")
+        if check.get("faulted"):
+            raise CloudArtworkError("AI Horde generation failed on all available workers.")
+        if check.get("done"):
+            break
+    else:
+        raise CloudArtworkError("AI Horde queue timed out after 30 minutes.")
+    result = _request(f"/generate/status/{job_id}")
+    generations = result.get("generations") or []
+    if not generations or not generations[0].get("img"):
+        raise CloudArtworkError("AI Horde completed without returning an image.")
+    image_value = generations[0]["img"]
+    if image_value.startswith("http://") or image_value.startswith("https://"):
+        req = urllib.request.Request(image_value, headers={"User-Agent": "HikayatunaKids/1.0"})
+        with urllib.request.urlopen(req, timeout=90) as response:
+            image_bytes = response.read()
+    else:
+        import base64
+        image_bytes = base64.b64decode(image_value)
+    if len(image_bytes) < 10_000:
+        raise CloudArtworkError("AI Horde image failed the file integrity check.")
+    if not (image_bytes.startswith(b"\\xff\\xd8\\xff") or image_bytes.startswith(b"\\x89PNG")):
+        raise CloudArtworkError("AI Horde returned an unsupported or invalid image format.")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image_bytes)
