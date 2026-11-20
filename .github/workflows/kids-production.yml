@@ -89,7 +89,7 @@ jobs:
         run: |
           git config user.name "hikayatuna-kids-bot"
           git config user.email "actions@users.noreply.github.com"
-          find content/production/kids -mindepth 2 -maxdepth 2 -type f \\\n            \\( -name manifest.json -o -name script.md -o -name storyboard.json -o -name quality-report.json \\) -print0 | xargs -0 -r git add --
+          find content/production/kids -mindepth 2 -maxdepth 2 -type f \( -name manifest.json -o -name script.md -o -name storyboard.json -o -name quality-report.json \) -print0 | xargs -0 -r git add --
           if git diff --cached --quiet; then
             echo "No new review artifact."
           else
