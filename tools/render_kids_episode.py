@@ -126,8 +126,21 @@ def make_scene_art(index: int, out: Path) -> None:
 
 
 async def make_voice(text: str, out: Path) -> None:
-    communicate = edge_tts.Communicate(text, VOICE, rate="+0%", volume="+0%")
-    await communicate.save(str(out))
+    # Prefer the natural Egyptian voice; fall back to local Arabic speech when
+    # the hosted runner cannot reach the Edge TTS websocket service.
+    try:
+        communicate = edge_tts.Communicate(text, VOICE, rate="+0%", volume="+0%")
+        await asyncio.wait_for(communicate.save(str(out)), timeout=35)
+        if out.exists() and out.stat().st_size > 2048:
+            return
+    except Exception as exc:
+        print(f"Hosted Arabic TTS unavailable; using local Arabic voice: {type(exc).__name__}")
+    wav = out.with_suffix(".wav")
+    run(["espeak-ng", "-v", "ar", "-s", "142", "-a", "165", "-w", str(wav), text])
+    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(wav), "-codec:a", "libmp3lame", "-b:a", "160k", str(out)])
+    wav.unlink(missing_ok=True)
+    if not out.exists() or out.stat().st_size < 2048:
+        raise RuntimeError("Arabic voice generation failed for this scene.")
 
 
 def main() -> int:
