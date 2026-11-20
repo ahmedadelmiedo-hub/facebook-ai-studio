@@ -188,7 +188,11 @@ def main() -> int:
     target_duration = 180.0
     if actual_duration > target_duration:
         raise RuntimeError(f"Arabic narration is {actual_duration:.1f}s; over the 180s target. Shorten the script before rendering.")
-    # Pad with quiet room tone to a precise three-minute master; never cut spoken words.
+    if actual_duration < 170.0:
+        raise RuntimeError(
+            f"Arabic narration is only {actual_duration:.1f}s. Refusing to fill a three-minute episode with long silence; expand the story script."
+        )
+    # Pad by at most ten seconds with quiet room tone; never cut spoken words.
     mastered = assets / "narration-180s.mp3"
     run(["ffmpeg","-y","-hide_banner","-loglevel","error","-i",str(narration),"-af","apad=pad_dur=180","-t","180","-c:a","libmp3lame","-b:a","192k",str(mastered)])
     # Extend the final visual scene over the closing room tone.
