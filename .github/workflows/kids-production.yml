@@ -38,7 +38,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      # The safe preparation and test path uses only Python's standard library.
+      # Backend tests import requests through the avatar provider module.
+      - name: Install backend test dependency
+        run: python -m pip install requests
       - name: Validate and prepare episode
         env:
           EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
