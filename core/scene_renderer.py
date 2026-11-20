@@ -126,7 +126,7 @@ def _render_scene(image: Path, scene: dict[str, Any], output: Path, width: int, 
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-loop", "1", "-framerate", str(fps), "-i", str(image), "-t", f"{duration:.3f}",
         "-vf", vf,
-        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps),
+        "-an", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", str(fps),
         str(output),
     ]
     _run(command)
@@ -275,7 +275,7 @@ def render_visual_video(
     plan = load_scene_plan(scene_plan)
     audio_duration = probe_duration(audio_path)
     validate_scene_plan(plan, audio_duration)
-    width, height = (1080, 1920) if profile == "short" else (1920, 1080)
+    width, height = (1080, 1920) if profile == "short" else (1280, 720)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="scene-render-") as temp_dir:
         temp_root = Path(temp_dir)
