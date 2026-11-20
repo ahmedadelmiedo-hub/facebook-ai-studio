@@ -14,7 +14,7 @@
     "timo"
   ],
   "fingerprint": "0690266fc5e14344",
-  "status": "prepared_for_review",
+  "status": "render_requested",
   "provider_status": {
     "text": "mock",
     "image": "not_called",
@@ -46,5 +46,6 @@
     "video": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/episode.mp4",
     "short": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/short.mp4",
     "quality": "/home/ubuntu/facebook-ai-studio/content/production/kids/kids-ep-001/quality-report.json"
-  }
+  },
+  "review_target": "youtube_studio_private"
 }
