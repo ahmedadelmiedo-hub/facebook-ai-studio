@@ -70,8 +70,6 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_only == false }}
         env:
           EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python tools/render_kids_episode.py --episode-id "$EPISODE_ID"
       - name: Verify rendered MP4
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_only == false }}
