@@ -115,7 +115,7 @@ def generate_scene_image(index: int, output: Path, scene: dict[str, Any]) -> Non
     except Exception as exc:
         raise CloudArtworkError("Cloud image payload was not valid base64.") from exc
     if len(image_bytes) < 20_000 or not (
-        image_bytes.startswith(b"\\xff\\xd8\\xff") or image_bytes.startswith(b"\\x89PNG")
+        image_bytes.startswith(b"\xff\xd8\xff") or image_bytes.startswith(b"\x89PNG")
     ):
         raise CloudArtworkError(
             f"Generated image failed integrity checks ({len(image_bytes)} bytes)."
