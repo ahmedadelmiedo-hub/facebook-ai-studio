@@ -6,11 +6,13 @@ Anonymous requests are lowest priority and may wait or be rejected under load.
 from __future__ import annotations
 
 import json
-import os
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from io import BytesIO
+
+from PIL import Image
 from typing import Any
 
 API = "https://aihorde.net/api/v2"
@@ -62,7 +64,7 @@ def _request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]
         data=data,
         headers={
             "apikey": ANONYMOUS_KEY,
-            "Client-Agent": "HikayatunaKids:1.0:github-actions",
+            "Client-Agent": "HikayatunaKids:1.0:ahmedadelmiedo-hub",
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
@@ -96,15 +98,15 @@ def generate_scene_image(index: int, output: Path, scene: dict[str, Any]) -> Non
         },
         "nsfw": False,
         "censor_nsfw": True,
-        "models": ["stable_diffusion"],
         "r2": True,
     })
     job_id = submitted.get("id")
     if not job_id:
         raise CloudArtworkError("AI Horde did not return a generation job ID.")
-    deadline = time.monotonic() + 1800
+    # Horde generation requests expire after roughly ten minutes; do not poll beyond that window.
+    deadline = time.monotonic() + 540
     while time.monotonic() < deadline:
-        time.sleep(20)
+        time.sleep(10)
         check = _request(f"/generate/check/{job_id}")
         if check.get("faulted"):
             raise CloudArtworkError("AI Horde generation failed on all available workers.")
@@ -123,10 +125,16 @@ def generate_scene_image(index: int, output: Path, scene: dict[str, Any]) -> Non
             image_bytes = response.read()
     else:
         import base64
-        image_bytes = base64.b64decode(image_value)
+        # Some workers return a data URI; others return raw base64.
+        encoded = image_value.split(",", 1)[-1] if image_value.startswith("data:") else image_value
+        image_bytes = base64.b64decode(encoded, validate=False)
     if len(image_bytes) < 10_000:
         raise CloudArtworkError("AI Horde image failed the file integrity check.")
-    if not (image_bytes.startswith(b"\\xff\\xd8\\xff") or image_bytes.startswith(b"\\x89PNG")):
-        raise CloudArtworkError("AI Horde returned an unsupported or invalid image format.")
+    try:
+        with Image.open(BytesIO(image_bytes)) as generated:
+            generated.load()
+            generated.convert("RGB").save(output, format="PNG", optimize=True)
+    except Exception as exc:
+        raise CloudArtworkError(f"AI Horde returned an unreadable image: {exc}") from exc
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image_bytes)
