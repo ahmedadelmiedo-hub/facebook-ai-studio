@@ -221,14 +221,14 @@ def main() -> int:
     manifest_path = episode_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["status"]="rendered_for_private_review"
-    manifest["provider_status"]={"text":script.get("provider","unknown"),"image":"original_local_artwork","voice":VOICE,"video":"ffmpeg"}
+    manifest["provider_status"]={"text":script.get("provider","unknown"),"image":"cloudflare_flux_1_schnell","voice":VOICE,"video":"ffmpeg"}
     manifest["quality_gate"]["status"]="blocked"
     manifest["quality_gate"]["human_approval"]=False
     manifest["quality_gate"]["media_validation"]={"mp4_exists":True,"duration_seconds":round(final_duration,2),"has_narration":True,"captions":"burned_in"}
     manifest["publishing"]={"enabled":False,"privacy":"private","youtube_video_id":None}
     manifest["artifacts"]["video"]=str(output.relative_to(ROOT))
     manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    report={"episode_id":args.episode_id,"video":str(output.relative_to(ROOT)),"duration_seconds":round(final_duration,2),"voice":VOICE,"voice_source":"Edge TTS service; no API key configured","captions":"Arabic ASS burned into video","artwork":"original Pillow illustrations","music":"none; no unlicensed music used","privacy":"private review only","public_publish":False}
+    report={"episode_id":args.episode_id,"video":str(output.relative_to(ROOT)),"duration_seconds":round(final_duration,2),"voice":VOICE,"voice_source":"Edge TTS service; no API key configured","captions":"Arabic ASS burned into video","artwork":"Cloudflare Workers AI FLUX.1 schnell generated illustrations","music":"none; no unlicensed music used","privacy":"private review only","public_publish":False}
     (episode_dir/"quality-report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(report,ensure_ascii=False))
     return 0
