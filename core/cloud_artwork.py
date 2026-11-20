@@ -103,8 +103,8 @@ def generate_scene_image(index: int, output: Path, scene: dict[str, Any]) -> Non
     job_id = submitted.get("id")
     if not job_id:
         raise CloudArtworkError("AI Horde did not return a generation job ID.")
-    # Horde generation requests expire after roughly ten minutes; do not poll beyond that window.
-    deadline = time.monotonic() + 540
+    # Anonymous workers can be slow; the renderer falls back to local art after three minutes.
+    deadline = time.monotonic() + 180
     while time.monotonic() < deadline:
         time.sleep(10)
         check = _request(f"/generate/check/{job_id}")
