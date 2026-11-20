@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw
 
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.scene_renderer import probe_duration, render_visual_video
+from core.cloud_artwork import generate_scene_image
 VOICE = "ar-EG-ShakirNeural"
 W, H = 1920, 1080
 
@@ -126,21 +127,17 @@ def make_scene_art(index: int, out: Path) -> None:
 
 
 async def make_voice(text: str, out: Path) -> None:
-    # Prefer the natural Egyptian voice; fall back to local Arabic speech when
-    # the hosted runner cannot reach the Edge TTS websocket service.
+    """Generate the approved Egyptian male narration through hosted Edge TTS only."""
     try:
         communicate = edge_tts.Communicate(text, VOICE, rate="+0%", volume="+0%")
-        await asyncio.wait_for(communicate.save(str(out)), timeout=35)
-        if out.exists() and out.stat().st_size > 2048:
-            return
+        await asyncio.wait_for(communicate.save(str(out)), timeout=90)
     except Exception as exc:
-        print(f"Hosted Arabic TTS unavailable; using local Arabic voice: {type(exc).__name__}")
-    wav = out.with_suffix(".wav")
-    run(["espeak-ng", "-v", "ar", "-s", "142", "-a", "165", "-w", str(wav), text])
-    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(wav), "-codec:a", "libmp3lame", "-b:a", "160k", str(out)])
-    wav.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Hosted Arabic TTS failed ({type(exc).__name__}). "
+            "The workflow will stop instead of substituting a low-quality local voice."
+        ) from exc
     if not out.exists() or out.stat().st_size < 2048:
-        raise RuntimeError("Arabic voice generation failed for this scene.")
+        raise RuntimeError("Hosted Arabic TTS returned an empty or invalid audio file.")
 
 
 def main() -> int:
@@ -174,7 +171,7 @@ def main() -> int:
         asyncio.run(make_voice(spoken,audio_path))
         duration = probe_duration(audio_path)
         image_path = image_dir / f"scene-{idx:02d}.png"
-        make_scene_art(idx,image_path)
+        generate_scene_image(idx, image_path, scene)
         scene_audio.append(audio_path)
         scene_durations.append(duration)
         concat_entries.append(f"file '{audio_path.resolve().as_posix()}'")
@@ -224,14 +221,14 @@ def main() -> int:
     manifest_path = episode_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["status"]="rendered_for_private_review"
-    manifest["provider_status"]={"text":script.get("provider","unknown"),"image":"original_local_artwork","voice":VOICE,"video":"ffmpeg"}
+    manifest["provider_status"]={"text":script.get("provider","unknown"),"image":"aihorde_community_workers","voice":VOICE,"video":"ffmpeg"}
     manifest["quality_gate"]["status"]="blocked"
     manifest["quality_gate"]["human_approval"]=False
     manifest["quality_gate"]["media_validation"]={"mp4_exists":True,"duration_seconds":round(final_duration,2),"has_narration":True,"captions":"burned_in"}
     manifest["publishing"]={"enabled":False,"privacy":"private","youtube_video_id":None}
     manifest["artifacts"]["video"]=str(output.relative_to(ROOT))
     manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    report={"episode_id":args.episode_id,"video":str(output.relative_to(ROOT)),"duration_seconds":round(final_duration,2),"voice":VOICE,"voice_source":"Edge TTS service; no API key configured","captions":"Arabic ASS burned into video","artwork":"original Pillow illustrations","music":"none; no unlicensed music used","privacy":"private review only","public_publish":False}
+    report={"episode_id":args.episode_id,"video":str(output.relative_to(ROOT)),"duration_seconds":round(final_duration,2),"voice":VOICE,"voice_source":"Edge TTS service; no API key configured","captions":"Arabic ASS burned into video","artwork":"AI Horde community-generated illustrations","music":"none; no unlicensed music used","privacy":"private review only","public_publish":False}
     (episode_dir/"quality-report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(report,ensure_ascii=False))
     return 0

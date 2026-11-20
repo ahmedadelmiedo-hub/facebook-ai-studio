@@ -3,8 +3,6 @@ name: Hikayatuna Kids - daily prepare
 on:
   pull_request:
     branches: [main]
-  schedule:
-    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       episode_id:
@@ -62,16 +60,19 @@ jobs:
       - name: Run backend tests
         run: python -m unittest discover -s tests -v
       - name: Install media runtime
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_only == false }}
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-core espeak-ng
           python -m pip install --upgrade pip
           python -m pip install Pillow edge-tts
       - name: Render private three-minute Arabic episode
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_only == false }}
         env:
           EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
         run: python tools/render_kids_episode.py --episode-id "$EPISODE_ID"
       - name: Verify rendered MP4
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_only == false }}
         env:
           EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
         run: |
