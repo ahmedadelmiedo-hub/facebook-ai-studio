@@ -36,23 +36,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install Python dependencies
-        run: python -m pip install -r requirements.txt
-      - name: Validate and prepare next episode
+      # The safe preparation and test path uses only Python's standard library.
+      - name: Validate and prepare episode
         env:
-          EPISODE_ID: ${{ inputs.episode_id }}
-        run: python -m core.kids_factory --mode prepare $([[ -n "$EPISODE_ID" ]] && echo "--episode-id $EPISODE_ID" || true)
+          EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
+        run: python -m core.kids_factory --mode prepare --episode-id "$EPISODE_ID"
       - name: Generate and validate Arabic script
         env:
-          EPISODE_ID: ${{ inputs.episode_id }}
-        run: python -m core.kids_script_engine --episode-id "${EPISODE_ID:-kids-ep-001}" --provider mock
+          EPISODE_ID: ${{ inputs.episode_id || 'kids-ep-001' }}
+        run: python -m core.kids_script_engine --episode-id "$EPISODE_ID" --provider mock
       - name: Run backend tests
         run: python -m unittest discover -s tests -v
       - name: Persist review artifact
         run: |
           git config user.name "hikayatuna-kids-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add content/kids-production
+          git add content/production/kids
           if git diff --cached --quiet; then
             echo "No new review artifact."
           else
@@ -63,6 +62,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hikayatuna-kids-review-${{ github.run_number }}
-          path: content/kids-production/
-          if-no-files-found: warn
+          path: content/production/kids/
+          if-no-files-found: error
           retention-days: 14
