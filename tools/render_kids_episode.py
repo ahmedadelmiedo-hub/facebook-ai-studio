@@ -6,7 +6,6 @@ and the repository's scene renderer. No public upload or third-party music.
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import subprocess
 import sys
@@ -15,13 +14,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import edge_tts
 from PIL import Image, ImageDraw
 
 from core.captions import CaptionCue, build_estimated_cues, write_arabic_ass
 from core.scene_renderer import probe_duration, render_visual_video
 from core.cloud_artwork import generate_scene_image
-VOICE = "ar-EG-ShakirNeural"
+from core.fish_audio_tts import generate_speech
 W, H = 1920, 1080
 
 
@@ -126,18 +124,9 @@ def make_scene_art(index: int, out: Path) -> None:
     image.save(out,format="PNG",optimize=True)
 
 
-async def make_voice(text: str, out: Path) -> None:
-    """Generate the approved Egyptian male narration through hosted Edge TTS only."""
-    try:
-        communicate = edge_tts.Communicate(text, VOICE, rate="+0%", volume="+0%")
-        await asyncio.wait_for(communicate.save(str(out)), timeout=90)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Hosted Arabic TTS failed ({type(exc).__name__}). "
-            "The workflow will stop instead of substituting a low-quality local voice."
-        ) from exc
-    if not out.exists() or out.stat().st_size < 2048:
-        raise RuntimeError("Hosted Arabic TTS returned an empty or invalid audio file.")
+def make_voice(text: str, out: Path) -> None:
+    """Generate Arabic narration using the configured Fish Audio voice."""
+    generate_speech(text, out)
 
 
 def main() -> int:
@@ -168,7 +157,7 @@ def main() -> int:
             parts.extend([script.get("original_song", ""), script.get("quiz", "")])
         spoken = " ".join(part.strip() for part in parts if part and part.strip())
         audio_path = audio_dir / f"scene-{idx:02d}.mp3"
-        asyncio.run(make_voice(spoken,audio_path))
+        make_voice(spoken,audio_path)
         duration = probe_duration(audio_path)
         image_path = image_dir / f"scene-{idx:02d}.png"
         generate_scene_image(idx, image_path, scene)
