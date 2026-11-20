@@ -22,7 +22,7 @@ permissions:
 
 concurrency:
   group: hikayatuna-kids-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   KIDS_PRODUCTION_ENABLED: "false"
